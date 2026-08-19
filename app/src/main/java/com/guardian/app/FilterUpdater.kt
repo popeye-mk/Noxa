@@ -42,6 +42,14 @@ object FilterUpdater {
         JSONObject(txt).optString("built_at", "")
     } catch (e: Exception) { "" }
 
+    /** True only if a *downloaded* filter is genuinely newer than the one bundled
+     *  in this APK. Prevents a stale download from overriding a fresh install. */
+    fun downloadedIsNewer(ctx: Context): Boolean {
+        val stored = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_BUILT_AT, null) ?: return false
+        return stored > bundledBuiltAt(ctx)   // ISO-ish timestamps compare as text
+    }
+
     /** Check the remote manifest; if newer, download + verify + swap the filter.
      *  Returns a human-readable result. MUST be called off the main thread. */
     fun checkAndUpdate(ctx: Context): String {

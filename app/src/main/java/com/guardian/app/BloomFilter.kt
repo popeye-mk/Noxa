@@ -70,8 +70,13 @@ class BloomFilter private constructor(
          *  bundled asset. This is what the service should call. */
         fun loadCurrent(ctx: Context): BloomFilter {
             val f = File(ctx.filesDir, FilterUpdater.FILTER_FILE)
-            return if (f.exists() && f.length() > 24) load(f.inputStream())
-            else load(ctx.assets.open("guardian-default.gbf"))
+            // Use a downloaded filter ONLY if it's genuinely newer than the one
+            // bundled in this APK — otherwise a stale download would silently
+            // override a fresh install's bigger/newer filter.
+            if (f.exists() && f.length() > 24 && FilterUpdater.downloadedIsNewer(ctx)) {
+                try { return load(f.inputStream()) } catch (_: Exception) {}
+            }
+            return load(ctx.assets.open("guardian-default.gbf"))
         }
 
         /** Load from an InputStream (e.g. assets.open("guardian-default.gbf")). */

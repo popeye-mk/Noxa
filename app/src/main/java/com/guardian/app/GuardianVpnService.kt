@@ -372,7 +372,7 @@ class GuardianVpnService : VpnService() {
             PendingIntent.FLAG_IMMUTABLE
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Guardian is protecting you")
+            .setContentTitle("Noxa is protecting you")
             .setContentText("Blocking trackers and ads")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(open)
