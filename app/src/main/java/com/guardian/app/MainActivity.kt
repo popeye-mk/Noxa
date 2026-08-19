@@ -45,7 +45,20 @@ class MainActivity : Activity() {
             startActivity(Intent(this, AppsActivity::class.java))
         }
         tick()
+        ensureNotificationPermission()
         maybeShowIntro()
+    }
+
+    /** Android 13+ hides the foreground "protecting you" notification unless the
+     *  user grants POST_NOTIFICATIONS at runtime — and aggressive OEM builds
+     *  (e.g. Xiaomi HyperOS) then kill a foreground service whose notification
+     *  isn't visible, which silently stops protection. Ask once, up front. */
+    private fun ensureNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2)
+        }
     }
 
     /** Step 6 — a one-time, plain-language "what is this" on first launch. */
@@ -53,9 +66,9 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("guardian_ui", MODE_PRIVATE)
         if (prefs.getBoolean("seen_intro", false)) return
         AlertDialog.Builder(this)
-            .setTitle("Welcome to Guardian")
+            .setTitle("Welcome to Noxa")
             .setMessage(
-                "Guardian blocks ads, trackers and malware across your WHOLE phone — " +
+                "Noxa blocks ads, trackers and malware across your WHOLE phone — " +
                 "every app, not just the browser.\n\n" +
                 "• Flip the switch on to start. That's the whole setup.\n" +
                 "• \"Per-app details\" shows who's tracking you, and lets you block any app.\n" +
