@@ -102,12 +102,13 @@ ALLOWLIST_CATEGORIES = [
 # which would block Guardian's own upstream resolver's domain. Both Cloudflare and
 # Quad9 are listed so we can switch the upstream resolver freely later.
 ALLOWLIST_DOMAINS = [
-    # Public DNS resolvers + their help/diagnostic pages
-    "one.one.one.one",             # Cloudflare 1.1.1.1 resolver / help page
-    "cloudflare-dns.com",          # Cloudflare DoH endpoint
-    "dns.quad9.net",               # Quad9 DoH endpoint
-    "quad9.net",                   # Quad9
-    "dns.google",                  # Google Public DNS hostname
+    # Quad9's info site (NOT its DoH endpoint). The DoH endpoints that used to
+    # be allowlisted here (one.one.one.one, cloudflare-dns.com, dns.quad9.net,
+    # dns.google) were REMOVED on purpose: browsers use them to bypass the
+    # filter via "secure DNS". They are now blocked by the hagezi_doh source so
+    # every browser falls back to normal DNS, which we filter. Users who really
+    # want one can un-block it with the in-app allowlist.
+    "quad9.net",
     # Network connectivity / captive-portal checks — blocking these makes the OS
     # think there's "no internet" even when there is. Defensive: never sinkhole.
     "connectivitycheck.gstatic.com",
@@ -121,6 +122,13 @@ ALLOWLIST_DOMAINS = [
     "protonvpn.com",
     "proton.me",
     "ivpn.net",
+    # Browser ad-block list updates — a blocker must never starve OTHER blockers
+    # of their filter lists (learned the hard way: Brave stuck without its lists
+    # scores ~18 points worse on ad-block tests). Update endpoints only; Brave's
+    # telemetry domains (p3a.brave.com etc.) deliberately stay blocked.
+    "componentupdater.brave.com",
+    "go-updater.brave.com",
+    "brave-core-ext.s3.brave.com",
 ]
 
 # --- Bloom filter parameters -------------------------------------------------
@@ -170,6 +178,13 @@ EXTRA_SOURCES = {
     # Step 1 additions — modern, low-false-positive, actively maintained:
     "hagezi_pro":     ("blocklists/hagezi/pro.txt",           "adblock"),  # HaGeZi Multi PRO
     "adguard_dns":    ("blocklists/adguard/dns.txt",          "adblock"),  # AdGuard DNS filter
+    # Anti-bypass: hostnames of every public DoH resolver. Browsers (Brave/Chrome)
+    # bootstrap "secure DNS" by resolving these through the SYSTEM resolver — us.
+    # Sinkhole them and the browser silently falls back to normal DNS, which we
+    # filter. Same idea as the Firefox use-application-dns.net canary, but for
+    # every browser. Download:
+    #   https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/doh.txt
+    "hagezi_doh":     ("blocklists/hagezi/doh.txt",           "adblock"),  # DoH/DoT bypass
 }
 
 
