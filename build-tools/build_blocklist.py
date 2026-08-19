@@ -185,6 +185,11 @@ EXTRA_SOURCES = {
     # every browser. Download:
     #   https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/doh.txt
     "hagezi_doh":     ("blocklists/hagezi/doh.txt",           "adblock"),  # DoH/DoT bypass
+    # Improvement plan phase 1 — targeted at MEASURED gaps (social SDK 88%):
+    "dandelion_am":   ("blocklists/dandelion/antimalware.txt","adblock"),  # Anti-Malware
+    "facebook_sdk":   ("blocklists/social/facebook.txt",      "domains"),  # Meta pixel/SDK
+    "nocoin":         ("blocklists/nocoin/hosts.txt",         "hosts"),    # cryptomining
+    "phishing_army":  ("blocklists/phishing/phishing_army.txt","domains"), # phishing
 }
 
 
@@ -249,12 +254,27 @@ def read_adblock(path):
     return out
 
 
+def read_domains(path):
+    """Bare-domain list format: one domain per line (Phishing Army, jmdugan)."""
+    out = []
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            d = normalize(line)
+            if d:
+                out.append(d)
+    return out
+
+
 def read_extra_source(name):
     rel, fmt = EXTRA_SOURCES[name]
     path = os.path.join(ROOT, rel)
     if not os.path.isfile(path):
         return []
-    return read_hosts(path) if fmt == "hosts" else read_adblock(path)
+    if fmt == "hosts":
+        return read_hosts(path)
+    if fmt == "domains":
+        return read_domains(path)
+    return read_adblock(path)
 
 
 def bloom_params(n: int, p: float):

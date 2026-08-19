@@ -12,6 +12,7 @@ local.properties
 # (outside the repo; listed for clarity)
 
 # --- Known-good backup archives (large, local only) ---
+/backups/
 guardian-known-good-*.tgz
 
 # --- Raw blocklist sources (large; re-downloadable — see build-tools/README) ---

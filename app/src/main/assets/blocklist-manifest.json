@@ -1,15 +1,15 @@
 {
   "format": "GBF1",
-  "built_at": "2026-08-19 13:09:34",
+  "built_at": "2026-08-19 17:57:48",
   "false_positive_target": 1e-06,
   "bloom": {
-    "m_bits": 24770053,
+    "m_bits": 25746435,
     "k_hashes": 20,
-    "size_mb": 2.953,
-    "items": 861412
+    "size_mb": 3.069,
+    "items": 895367
   },
-  "unique_domains": 861412,
-  "raw_total": 1497706,
+  "unique_domains": 895367,
+  "raw_total": 1666982,
   "protection_categories": {
     "publicite": 4344,
     "malware": 250644,
@@ -32,7 +32,11 @@
     "oisd": 269330,
     "hagezi_pro": 217939,
     "adguard_dns": 154730,
-    "hagezi_doh": 3371
+    "hagezi_doh": 3371,
+    "dandelion_am": 11706,
+    "facebook_sdk": 9,
+    "nocoin": 313,
+    "phishing_army": 157248
   },
   "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); idx_i=(h1 + i*h2) mod m, i in 0..k-1"
 }
