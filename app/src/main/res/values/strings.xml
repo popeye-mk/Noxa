@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Noxa</string>
+    <string name="on">Protected — trackers and ads are being blocked</string>
+    <string name="off">Off — tap to turn on protection</string>
+    <string name="blocked_count">%1$d tracking attempts blocked (last 30 days)</string>
+    <string name="per_app_details">Per-app details ›</string>
+</resources>

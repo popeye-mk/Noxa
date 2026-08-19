@@ -1,0 +1,37 @@
+{
+  "format": "GBF1",
+  "built_at": "2026-08-19 11:04:39",
+  "false_positive_target": 1e-06,
+  "bloom": {
+    "m_bits": 24707741,
+    "k_hashes": 20,
+    "size_mb": 2.945,
+    "items": 859245
+  },
+  "unique_domains": 859245,
+  "raw_total": 1494335,
+  "protection_categories": {
+    "publicite": 4344,
+    "malware": 250644,
+    "phishing": 250557,
+    "cryptojacking": 11491,
+    "stalkerware": 525,
+    "marketingware": 77,
+    "ddos": 421,
+    "hacking": 274,
+    "dialer": 4,
+    "doh": 3015,
+    "dynamic-dns": 2077,
+    "residential-proxies": 138,
+    "redirector": 132323
+  },
+  "extra_sources": {
+    "stevenblack": 98951,
+    "easyprivacy": 46986,
+    "easylist": 50509,
+    "oisd": 269330,
+    "hagezi_pro": 217939,
+    "adguard_dns": 154730
+  },
+  "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); idx_i=(h1 + i*h2) mod m, i in 0..k-1"
+}

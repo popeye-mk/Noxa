@@ -1,0 +1,23 @@
+# --- Build outputs ---
+/app/build/
+/build/
+/.gradle/
+local.properties
+
+# --- IDE ---
+*.iml
+.idea/
+
+# --- One-shot builder's downloaded toolchain (lives in ~/.guardian-build) ---
+# (outside the repo; listed for clarity)
+
+# --- Known-good backup archives (large, local only) ---
+guardian-known-good-*.tgz
+
+# --- Raw blocklist sources (large; re-downloadable — see build-tools/README) ---
+# The COMPILED filter (app/src/main/assets/guardian-default.gbf) IS committed,
+# so the app builds without these. Only needed to REBUILD the filter.
+/blocklists/
+
+# --- Build-tool intermediate output (the compiled filter is copied into app/) ---
+/build-tools/out/
