@@ -22,6 +22,7 @@ object AppStats {
     private const val KEY_FIREWALL = "firewall"
     private const val KEY_COMPANIES = "companies"
     private const val KEY_USER_ALLOW = "user_allow"
+    private const val KEY_COMPAT_SEEDED = "compat_seeded_v1"
 
     /** Used when we can't attribute a lookup to a specific app (e.g. system). */
     const val UNKNOWN = "(system / unknown)"
@@ -104,6 +105,21 @@ object AppStats {
             val arr = JSONArray(p.getString(KEY_USER_ALLOW, "[]"))
             for (i in 0 until arr.length()) userAllow[arr.getString(i)] = true
         } catch (_: Exception) {}
+        // App-compatibility defaults — SEEDED ONCE into the user's allowlist.
+        // Some apps hard-refuse to start when their startup beacon is blocked
+        // (verified on real devices: Disney+ error 142 — its first-party-looking
+        // subdomains CNAME to an analytics partner, our uncloaking catches it,
+        // and the app won't run without it). Seeding (not hardcoding) keeps the
+        // user in charge: entries are visible in "Allowed sites" and can be
+        // deleted there — we never re-add them once seeded.
+        if (!p.getBoolean(KEY_COMPAT_SEEDED, false)) {
+            userAllow["disneystreaming.com"] = true        // Disney+ (error 142)
+            userAllow["device-metrics-us.amazon.com"] = true   // Prime Video on TV
+            userAllow["device-metrics-us-2.amazon.com"] = true
+            userAllow["bam.nr-data.net"] = true            // Disney+ startup beacon
+            p.edit().putBoolean(KEY_COMPAT_SEEDED, true).apply()
+            save(ctx)
+        }
         companiesByApp.clear()
         try {
             val o = JSONObject(p.getString(KEY_COMPANIES, "{}"))
