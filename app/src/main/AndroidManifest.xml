@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Phase 2 per-app dashboard (one tap deeper, not the default screen). -->
+        <activity
+            android:name=".AppsActivity"
+            android:exported="false" />
+
+        <!-- Tunnel (option 2) config screen — one tap deeper. -->
+        <activity
+            android:name=".TunnelActivity"
+            android:exported="false" />
+
+        <!-- User allowlist ("never block these") — one tap deeper. -->
+        <activity
+            android:name=".AllowlistActivity"
+            android:exported="false" />
+
+        <!-- The local filter. BIND_VPN_SERVICE is what lets us inspect traffic
+             on-device; nothing is sent to any server. -->
+        <service
+            android:name=".GuardianVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="systemExempted"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+    </application>
+</manifest>
