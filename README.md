@@ -47,6 +47,16 @@ The honest limits: DNS-level blocking can't hide same-domain/cosmetic ads (pair 
 
 ---
 
+## Troubleshooting
+
+A few apps refuse to start when their startup analytics beacon is blocked —
+that's them, not you. Noxa ships with a tiny "app compatibility" set of
+allowlist entries (visible and deletable in **Allowed sites**) covering the
+known ones: Disney+ (error 142, `disneystreaming.com`) and Prime Video on
+Android TV (`device-metrics-us.amazon.com`). If another app misbehaves with
+Noxa on, add its domain to **Allowed sites** — and please open an issue so it
+can help everyone.
+
 ## Not affiliated
 
 Noxa is an independent project, not affiliated with any other privacy/security product.

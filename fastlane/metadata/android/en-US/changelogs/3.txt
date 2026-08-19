@@ -1,0 +1,4 @@
+• App compatibility: Disney+ (error 142) and Prime Video on Android TV now
+  work out of the box — their required startup endpoints are pre-allowlisted
+  (visible and removable in Allowed sites)
+• Troubleshooting section in the README
