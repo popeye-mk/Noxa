@@ -73,9 +73,15 @@ GRADLE="$TOOLS/gradle-8.7/bin/gradle"
 
 echo "==> [6/6] Building the APK (first run downloads dependencies, be patient)..."
 cd "$ROOT"
-"$GRADLE" assembleDebug --no-daemon
-
+# Pass "release" as the first argument for a signed release build
+# (needs keystore.properties — see docs/FDROID-AND-RELEASE.md):
+#     bash build-on-linux.sh release
+TARGET="assembleDebug"
 APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+[ "${1:-}" = "release" ] && TARGET="assembleRelease" \
+  && APK="$ROOT/app/build/outputs/apk/release/app-release.apk"
+"$GRADLE" "$TARGET" --no-daemon
+
 echo ""
 echo "-----------------------------------------------------------------------"
 if [ -f "$APK" ]; then

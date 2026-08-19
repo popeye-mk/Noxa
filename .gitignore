@@ -8,6 +8,11 @@ local.properties
 *.iml
 .idea/
 
+# --- Release signing (SECRET — never commit these) ---
+keystore.properties
+*.jks
+*.keystore
+
 # --- One-shot builder's downloaded toolchain (lives in ~/.guardian-build) ---
 # (outside the repo; listed for clarity)
 

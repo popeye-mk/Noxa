@@ -118,7 +118,7 @@ class AppsActivity : Activity() {
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         if (apps.isEmpty()) {
             list.addView(TextView(this).apply {
-                text = "No activity yet. Turn Guardian on and use the phone for a bit, then come back."
+                text = "No activity yet. Turn Noxa on and use the phone for a bit, then come back."
                 setTextColor(Color.parseColor("#8AA0B2"))
                 setPadding(0, dp(24), 0, 0)
             })
@@ -196,10 +196,10 @@ class AppsActivity : Activity() {
     private fun exportCsv() {
         val share = Intent(Intent.ACTION_SEND).apply {
             type = "text/csv"
-            putExtra(Intent.EXTRA_SUBJECT, "Guardian per-app stats")
+            putExtra(Intent.EXTRA_SUBJECT, "Noxa per-app stats")
             putExtra(Intent.EXTRA_TEXT, AppStats.exportCsv())
         }
-        startActivity(Intent.createChooser(share, "Export Guardian stats"))
+        startActivity(Intent.createChooser(share, "Export Noxa stats"))
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()

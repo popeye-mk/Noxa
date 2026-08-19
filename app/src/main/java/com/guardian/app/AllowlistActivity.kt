@@ -40,7 +40,7 @@ class AllowlistActivity : Activity() {
             setTypeface(typeface, Typeface.BOLD)
         })
         root.addView(TextView(this).apply {
-            text = "If Guardian ever blocks something you need, add its address here and " +
+            text = "If Noxa ever blocks something you need, add its address here and " +
                 "it will never be blocked. Example: example.com"
             setTextColor(Color.parseColor("#8AA0B2")); textSize = 13f
             setPadding(0, dp(4), 0, dp(16))

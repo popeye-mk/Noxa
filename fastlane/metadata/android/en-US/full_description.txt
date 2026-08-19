@@ -1,0 +1,28 @@
+Privacy is a right, not a privilege.
+
+Noxa blocks ads, trackers, and malware across your WHOLE phone — every app, not just the browser. One switch, that's the whole setup.
+
+How it works: Noxa runs a local filter on Android's VpnService (it is not a real VPN by default — nothing leaves your phone). Every app's DNS lookups are checked against a compiled filter of ~900,000 known ad, tracker, malware, and phishing domains. Blocked domains simply never connect.
+
+Features:
+
+• System-wide blocking — every app, every browser, no configuration
+• Plain-language stats — see WHO is tracking you ("Google · Advertising", "Xiaomi · Analytics"), per app
+• Per-app firewall — block any app from the internet entirely with one switch
+• CNAME uncloaking — catches trackers disguised as first-party subdomains
+• Secure-DNS bypass protection — browsers can't tunnel their lookups around the filter
+• Encrypted DNS (DoH) — hides your lookups from your ISP or Wi-Fi
+• Hide my IP — optional WireGuard tunnel through YOUR provider (Proton, Mullvad, IVPN, or your own server), with blocking active while tunnelling
+• Your own allowlist — un-block anything, yourself
+• 30-day rolling stats, CSV export
+
+The guarantees:
+
+• Zero telemetry — nothing about you leaves your device, verifiable in the source
+• No servers — Noxa has no backend, so there is no bill that could ever force it to monetize you
+• No location permission, no accounts, no ads
+• Free forever — AGPL-3.0 copyleft: nobody, not even the author, can close it and sell it
+
+Honest limits: DNS-level blocking cannot hide same-domain "cosmetic" ads (pair Noxa with a privacy browser for those), and it cannot stop a service you are logged into from tracking what you do on that service.
+
+Built for the people, and given back to them.
