@@ -100,6 +100,24 @@ A filter push does NOT need a new APK or release.
 4. GitHub → Releases → Draft a new release → choose tag vX.Y.Z →
    attach the APK → Publish.
 
+### Full copy-paste example (replace 1.0.1 with the new version everywhere)
+
+    cd ~/Desktop/privacy
+    bash build-on-linux.sh release
+    cp app/build/outputs/apk/release/app-release.apk noxa-v1.0.1.apk
+    git add -A
+    git commit -m "v1.0.1: <what changed>"
+    git push origin main
+    git tag v1.0.1
+    git push origin v1.0.1
+
+Then in the browser:
+1. https://github.com/popeye-mk/Noxa/releases/new
+2. Choose a tag → v1.0.1 (pick the existing one, don't type a new one)
+3. Title: Noxa 1.0.1
+4. Description: what changed, in plain words (reuse the changelog text)
+5. Attach noxa-v1.0.1.apk from the privacy folder → Publish release
+
 ---
 
 ## Git basics used here
