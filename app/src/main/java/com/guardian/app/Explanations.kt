@@ -12,13 +12,13 @@ object Explanations {
     fun header(totalBlocked: Long): String {
         val g = AppStats.globalCompanyCounts()
         if (totalBlocked <= 0L || g.isEmpty())
-            return "Nothing blocked yet — turn Guardian on and use the phone for a bit."
+            return "Nothing blocked yet — turn Noxa on and use the phone for a bit."
         val companies = g.keys.map { Trackers.companyOf(it) }.toSet().size
         val top = g.entries.sortedByDescending { it.value }
             .map { Trackers.companyOf(it.key) }
             .distinct().take(3)
             .joinToString(", ")
-        return "In the last 30 days Guardian blocked $totalBlocked tracking attempts from " +
+        return "In the last 30 days Noxa blocked $totalBlocked tracking attempts from " +
             "$companies companies. Most persistent: $top."
     }
 
@@ -35,10 +35,10 @@ object Explanations {
     /** Full breakdown shown when a user taps an app. */
     fun appDetail(appLabel: String, pkg: String): String {
         val counts = AppStats.companyCounts(pkg).entries.sortedByDescending { it.value }
-        if (counts.isEmpty()) return "Guardian hasn't blocked any trackers from $appLabel yet."
+        if (counts.isEmpty()) return "Noxa hasn't blocked any trackers from $appLabel yet."
         val total = counts.sumOf { it.value }
         val sb = StringBuilder()
-        sb.append("$appLabel made $total tracking attempts that Guardian blocked.\n\n")
+        sb.append("$appLabel made $total tracking attempts that Noxa blocked.\n\n")
         sb.append("Who it was trying to reach:\n")
         for (e in counts) sb.append("  • ${e.key} — ${e.value}\n")
         return sb.toString().trimEnd()

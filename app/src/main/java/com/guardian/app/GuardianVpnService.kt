@@ -126,7 +126,7 @@ class GuardianVpnService : VpnService() {
         maybeResetStatsPeriod()          // roll the counters every 30 days
 
         val builder = Builder()
-            .setSession("Guardian")
+            .setSession("Noxa")
             .addAddress("10.111.0.1", 32)          // our tun interface (IPv4)
             .addDnsServer("10.111.0.2")            // pseudo DNS server — MUST differ
             .addRoute("10.111.0.2", 32)            // from the interface, routed to us

@@ -29,7 +29,7 @@ import java.io.StringReader
  *   A. Tor (free, easiest)  — hands off to Orbot. No account, no config.
  *   B. VPN provider (faster) — paste/scan a WireGuard config. (QR scan next.)
  *
- * Guardian runs no servers; both paths use infrastructure the user trusts.
+ * Noxa runs no servers; both paths use infrastructure the user trusts.
  * This increment wires the Tor hand-off and keeps saving the WireGuard config;
  * actually establishing the WireGuard tunnel comes in a later increment.
  */
@@ -63,7 +63,7 @@ class TunnelActivity : Activity() {
         root.addView(title("Hide my IP"))
         root.addView(muted(
             "Use this on untrusted networks (public Wi-Fi) to hide your real IP. " +
-            "You don't need it at home. Guardian runs no servers — both options " +
+            "You don't need it at home. Noxa runs no servers — both options " +
             "below route through something you trust."
         ).apply { setPadding(0, dp(6), 0, dp(20)) })
 

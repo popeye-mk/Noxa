@@ -1,0 +1,7 @@
+First public release.
+• System-wide ad/tracker/malware blocking (~900k domains)
+• Per-app stats & firewall, plain-language tracker names
+• CNAME uncloaking + secure-DNS bypass protection
+• Encrypted DNS (DoH)
+• Optional WireGuard "hide my IP" tunnel with blocking active
+• User allowlist, 30-day stats, CSV export
