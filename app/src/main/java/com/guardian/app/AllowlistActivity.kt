@@ -30,7 +30,7 @@ class AllowlistActivity : Activity() {
     private fun buildUi(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setBackgroundResource(R.drawable.bg_main)
             setPadding(dp(20), dp(24), dp(20), dp(24))
         }
 
@@ -50,14 +50,14 @@ class AllowlistActivity : Activity() {
             hint = "example.com"
             setHintTextColor(Color.parseColor("#55627A"))
             setTextColor(Color.WHITE); textSize = 15f
-            setBackgroundColor(Color.parseColor("#161B22"))
+            setBackgroundResource(R.drawable.field_dark)
             setPadding(dp(12), dp(12), dp(12), dp(12))
             isSingleLine = true
         }
         root.addView(field)
         root.addView(Button(this).apply {
             text = "Add to allowlist"
-            setBackgroundColor(Color.parseColor("#1B2430")); setTextColor(Color.WHITE)
+            setBackgroundResource(R.drawable.btn_primary); setTextColor(Color.WHITE)
             setOnClickListener {
                 val d = field.text.toString()
                 if (d.isNotBlank()) {

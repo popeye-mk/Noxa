@@ -1,0 +1,6 @@
+• New: "Don't filter this app" — exclude any app from Noxa entirely, via
+  the picker in Per-app details or by tapping an app's row. For apps that
+  refuse to work when they detect a VPN (Disney+ "no internet", some
+  banking apps). Excluded apps work normally but are not protected.
+• Visual refresh: night-sky gradient, rounded buttons, violet accent
+  matching the icon

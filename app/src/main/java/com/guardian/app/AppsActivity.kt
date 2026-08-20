@@ -43,7 +43,7 @@ class AppsActivity : Activity() {
     private fun buildUi(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setBackgroundResource(R.drawable.bg_main)
             setPadding(dp(20), dp(24), dp(20), dp(24))
         }
 
@@ -70,7 +70,7 @@ class AppsActivity : Activity() {
 
         root.addView(Button(this).apply {
             text = "Export stats (CSV)"
-            setBackgroundColor(Color.parseColor("#1B2430"))
+            setBackgroundResource(R.drawable.btn_dark)
             setTextColor(Color.WHITE)
             setOnClickListener { exportCsv() }
         })
@@ -78,7 +78,7 @@ class AppsActivity : Activity() {
         // Tunnel (option 2) — one tap deeper.
         root.addView(Button(this).apply {
             text = "Hide my IP (tunnel) ›"
-            setBackgroundColor(Color.parseColor("#161B22"))
+            setBackgroundResource(R.drawable.btn_secondary)
             setTextColor(Color.parseColor("#8AA0B2"))
             setOnClickListener { startActivity(Intent(this@AppsActivity, TunnelActivity::class.java)) }
         })
@@ -86,7 +86,7 @@ class AppsActivity : Activity() {
         // User allowlist — un-block anything caught by mistake.
         root.addView(Button(this).apply {
             text = "Allowed sites (never block) ›"
-            setBackgroundColor(Color.parseColor("#161B22"))
+            setBackgroundResource(R.drawable.btn_secondary)
             setTextColor(Color.parseColor("#8AA0B2"))
             setOnClickListener { startActivity(Intent(this@AppsActivity, AllowlistActivity::class.java)) }
         })
@@ -100,7 +100,7 @@ class AppsActivity : Activity() {
         root.addView(filterStatus)
         root.addView(Button(this).apply {
             text = "Check for blocklist update"
-            setBackgroundColor(Color.parseColor("#1B2430"))
+            setBackgroundResource(R.drawable.btn_dark)
             setTextColor(Color.WHITE)
             setOnClickListener {
                 filterStatus.text = "Checking for update…"
@@ -112,6 +112,16 @@ class AppsActivity : Activity() {
                     }
                 }.start()
             }
+        })
+
+        // "Don't filter this app" for apps that refuse to work behind a VPN —
+        // reachable even when the app has never appeared in the stats list
+        // (VPN-detecting apps often never send a single lookup through us).
+        root.addView(Button(this).apply {
+            text = "App won't work with Noxa on? Exclude it ›"
+            setBackgroundResource(R.drawable.btn_dark)
+            setTextColor(Color.WHITE)
+            setOnClickListener { showExcludePicker() }
         })
 
         val apps = AppStats.seenApps().sortedByDescending { AppStats.blocked[it] ?: 0L }
@@ -145,10 +155,8 @@ class AppsActivity : Activity() {
             text = "$blocked blocked · $allowed allowed"
             setTextColor(Color.parseColor("#8AA0B2")); textSize = 12f
         })
-        col.addView(TextView(this).apply {   // Phase 3: plain-language who/why
-            text = Explanations.appSummary(pkg)
-            setTextColor(Color.parseColor("#4CC38A")); textSize = 13f
-        })
+        // The plain-language "who was this app reaching" breakdown lives one tap
+        // deeper (tap the row) — keeping the list itself clean and scannable.
 
         val block = Switch(this).apply {
             isChecked = AppStats.isFirewalled(pkg)
@@ -186,10 +194,51 @@ class AppsActivity : Activity() {
 
     /** Tap an app -> plain-language breakdown of who it was trying to reach. */
     private fun showDetail(name: String, pkg: String) {
+        val excluded = AppStats.isNoFilter(pkg)
+        val extra = if (excluded)
+            "\n\n⚠ Not filtered: this app bypasses Noxa completely (it works, " +
+            "but nothing is blocked or counted for it)."
+        else ""
         AlertDialog.Builder(this)
             .setTitle(name)
-            .setMessage(Explanations.appDetail(name, pkg))
+            .setMessage(Explanations.appDetail(name, pkg) + extra)
             .setPositiveButton("Close", null)
+            .setNeutralButton(if (excluded) "Filter this app again" else "Don't filter this app") { _, _ ->
+                AppStats.setNoFilter(this, pkg, !excluded)
+                Toast.makeText(this,
+                    (if (!excluded) "$name will bypass Noxa" else "$name is filtered again") +
+                    " — turn protection off and on to apply.",
+                    Toast.LENGTH_LONG).show()
+            }
+            .show()
+    }
+
+    /** Pick ANY installed app to exclude from Noxa (VpnService bypass). For
+     *  apps that show "no internet" while a VPN is active (Disney+, some
+     *  banking apps). ✓ marks currently excluded apps; tapping toggles. */
+    private fun showExcludePicker() {
+        val pm = packageManager
+        val launchables = pm.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .map { it.activityInfo.packageName }.distinct()
+            .filter { it != packageName }
+            .map { pkg -> Pair(label(pkg), pkg) }
+            .sortedBy { it.first.lowercase() }
+        val labels = launchables.map { (name, pkg) ->
+            (if (AppStats.isNoFilter(pkg)) "✓ " else "") + name
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Exclude an app from Noxa")
+            .setItems(labels) { _, i ->
+                val (name, pkg) = launchables[i]
+                val nowOn = !AppStats.isNoFilter(pkg)
+                AppStats.setNoFilter(this, pkg, nowOn)
+                Toast.makeText(this,
+                    (if (nowOn) "$name will bypass Noxa" else "$name is filtered again") +
+                    " — turn protection off and on to apply.",
+                    Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("Close", null)
             .show()
     }
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Primary action: the icon's indigo→violet, rounded, with built-in spacing. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="6dp" android:bottom="6dp">
+        <shape>
+            <corners android:radius="14dp" />
+            <gradient android:angle="0"
+                android:startColor="#5B5BD6" android:endColor="#7C5CFF" />
+        </shape>
+    </item>
+</layer-list>

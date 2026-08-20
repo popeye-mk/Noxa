@@ -138,6 +138,13 @@ class GuardianVpnService : VpnService() {
         // (DnsPacket still understands IPv6 — we just don't advertise it here.)
         // Don't filter Guardian's own traffic (provable zero-telemetry story).
         try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
+        // User-chosen "Don't filter this app" exclusions — for apps that refuse
+        // to run when they detect a VPN (Disney+ "no internet", some banking
+        // apps). Excluded apps see the plain network: they work, but Noxa
+        // can't protect or count them.
+        for (pkg in AppStats.noFilterList()) {
+            try { builder.addDisallowedApplication(pkg) } catch (_: Exception) {}
+        }
 
         val fd = builder.establish()
         if (fd == null) {

@@ -23,6 +23,7 @@ object AppStats {
     private const val KEY_COMPANIES = "companies"
     private const val KEY_USER_ALLOW = "user_allow"
     private const val KEY_COMPAT_SEEDED = "compat_seeded_v1"
+    private const val KEY_NO_FILTER = "no_filter_apps"
 
     /** Used when we can't attribute a lookup to a specific app (e.g. system). */
     const val UNKNOWN = "(system / unknown)"
@@ -32,6 +33,11 @@ object AppStats {
     /** app -> ("Company · Category" -> count) — the Phase 3 who/why breakdown. */
     val companiesByApp = ConcurrentHashMap<String, ConcurrentHashMap<String, Long>>()
     private val firewall = ConcurrentHashMap<String, Boolean>()
+    /** Apps EXCLUDED from Noxa entirely (VpnService addDisallowedApplication).
+     *  For apps that refuse to run when they detect a VPN (Disney+ shows "no
+     *  internet", some banking apps too). Their traffic bypasses Noxa: no
+     *  blocking, no stats — but the app works. Applied on next VPN start. */
+    private val noFilter = ConcurrentHashMap<String, Boolean>()
     /** User's personal "never block this" list — overrides the tracker filter. */
     private val userAllow = ConcurrentHashMap<String, Boolean>()
 
@@ -57,6 +63,14 @@ object AppStats {
 
     fun removeUserAllow(ctx: Context, domain: String) {
         userAllow.remove(domain); save(ctx)
+    }
+
+    // --- "Don't filter this app" (VPN exclusion) -----------------------------
+    fun isNoFilter(pkg: String): Boolean = noFilter.containsKey(pkg)
+    fun noFilterList(): List<String> = noFilter.keys.toList()
+    fun setNoFilter(ctx: Context, pkg: String, on: Boolean) {
+        if (on) noFilter[pkg] = true else noFilter.remove(pkg)
+        save(ctx)
     }
 
     fun recordBlocked(pkg: String, label: String) {
@@ -105,6 +119,11 @@ object AppStats {
             val arr = JSONArray(p.getString(KEY_USER_ALLOW, "[]"))
             for (i in 0 until arr.length()) userAllow[arr.getString(i)] = true
         } catch (_: Exception) {}
+        noFilter.clear()
+        try {
+            val arr = JSONArray(p.getString(KEY_NO_FILTER, "[]"))
+            for (i in 0 until arr.length()) noFilter[arr.getString(i)] = true
+        } catch (_: Exception) {}
         // App-compatibility defaults — SEEDED ONCE into the user's allowlist.
         // Some apps hard-refuse to start when their startup beacon is blocked
         // (verified on real devices: Disney+ error 142 — its first-party-looking
@@ -147,6 +166,7 @@ object AppStats {
             .putString(KEY_ALLOWED, toJson(allowed))
             .putString(KEY_FIREWALL, JSONArray(firewall.keys.toList()).toString())
             .putString(KEY_USER_ALLOW, JSONArray(userAllow.keys.toList()).toString())
+            .putString(KEY_NO_FILTER, JSONArray(noFilter.keys.toList()).toString())
             .putString(KEY_COMPANIES, companies.toString())
             .apply()
     }
