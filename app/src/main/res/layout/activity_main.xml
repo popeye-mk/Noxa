@@ -5,25 +5,27 @@
     android:orientation="vertical"
     android:gravity="center"
     android:padding="32dp"
-    android:background="#0E1116">
+    android:background="@drawable/bg_main">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/app_name"
         android:textColor="#FFFFFF"
-        android:textSize="28sp"
+        android:textSize="32sp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:letterSpacing="0.04"
+        android:layout_marginBottom="6dp" />
 
     <TextView
         android:id="@+id/status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/off"
-        android:textColor="#8AA0B2"
-        android:textSize="16sp"
-        android:layout_marginBottom="40dp" />
+        android:textColor="#8FA0BC"
+        android:textSize="15sp"
+        android:gravity="center"
+        android:layout_marginBottom="44dp" />
 
     <Switch
         android:id="@+id/toggle"
@@ -31,7 +33,9 @@
         android:layout_height="wrap_content"
         android:scaleX="2.2"
         android:scaleY="2.2"
-        android:layout_marginBottom="48dp" />
+        android:thumbTint="@color/switch_thumb"
+        android:trackTint="@color/switch_track"
+        android:layout_marginBottom="52dp" />
 
     <TextView
         android:id="@+id/counter"
@@ -39,15 +43,19 @@
         android:layout_height="wrap_content"
         android:text="@string/blocked_count"
         android:textColor="#4CC38A"
-        android:textSize="18sp" />
+        android:textStyle="bold"
+        android:gravity="center"
+        android:textSize="19sp" />
 
     <Button
         android:id="@+id/details"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="30dp"
+        android:paddingStart="28dp"
+        android:paddingEnd="28dp"
         android:text="@string/per_app_details"
-        android:backgroundTint="#1B2430"
+        android:background="@drawable/btn_primary"
         android:textColor="#FFFFFF" />
 
 </LinearLayout>

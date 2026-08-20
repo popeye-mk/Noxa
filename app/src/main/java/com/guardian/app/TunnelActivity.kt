@@ -56,7 +56,7 @@ class TunnelActivity : Activity() {
     private fun buildUi(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setBackgroundResource(R.drawable.bg_main)
             setPadding(dp(20), dp(24), dp(20), dp(24))
         }
 
@@ -75,7 +75,7 @@ class TunnelActivity : Activity() {
         ).apply { setPadding(0, dp(4), 0, dp(10)) })
         root.addView(Button(this).apply {
             text = "Use Tor (via Orbot)"
-            setBackgroundColor(Color.parseColor("#1B2430"))
+            setBackgroundResource(R.drawable.btn_dark)
             setTextColor(Color.WHITE)
             setOnClickListener { useTor() }
         })
@@ -95,7 +95,7 @@ class TunnelActivity : Activity() {
             hint = "[Interface]\nPrivateKey = ...\nAddress = ...\n[Peer]\nPublicKey = ...\nEndpoint = host:51820\nAllowedIPs = 0.0.0.0/0"
             setHintTextColor(Color.parseColor("#55627A"))
             setTextColor(Color.WHITE); textSize = 13f
-            setBackgroundColor(Color.parseColor("#161B22"))
+            setBackgroundResource(R.drawable.field_dark)
             setPadding(dp(12), dp(12), dp(12), dp(12))
             gravity = Gravity.TOP
             minLines = 7
@@ -105,13 +105,13 @@ class TunnelActivity : Activity() {
         root.addView(input)
         root.addView(Button(this).apply {
             text = "Import config from file (.conf)"
-            setBackgroundColor(Color.parseColor("#1B2430"))
+            setBackgroundResource(R.drawable.btn_dark)
             setTextColor(Color.WHITE)
             setOnClickListener { launchImport() }
         })
         root.addView(Button(this).apply {
             text = "Check & save config"
-            setBackgroundColor(Color.parseColor("#1B2430"))
+            setBackgroundResource(R.drawable.btn_primary)
             setTextColor(Color.WHITE)
             setOnClickListener { saveConfig() }
         })
