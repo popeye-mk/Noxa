@@ -6,6 +6,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Android TV support: TVs are among the most tracker-infested devices
+         people own (ACR, ad platforms, telemetry in every streaming app) and
+         almost nobody blocks any of it. Declaring these makes Noxa appear in
+         the TV launcher; requiring neither keeps phones unaffected. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+
     <!-- Android 11+ package visibility: lets the "exclude an app" picker list
          the user's launchable apps (names shown locally only — nothing leaves
          the device, as always). -->
@@ -20,6 +27,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:banner="@drawable/tv_banner"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
@@ -30,6 +38,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Shows Noxa in the Android TV home screen launcher too. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 

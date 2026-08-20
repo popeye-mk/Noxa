@@ -61,6 +61,10 @@ class GuardianVpnService : VpnService() {
         private const val NOTIF_ID = 1
         private const val TAG = "Guardian"
 
+        // v1.1: capture DNS over IPv6 too (closes the IPv6 bypass). Flip to
+        // false + rebuild for instant rollback to IPv4-only capture.
+        private const val IPV6_DNS = true
+
         // Persist the running totals so the counter survives the app being killed.
         const val PREFS = "guardian_stats"
         const val KEY_BLOCKED = "blocked"
@@ -131,11 +135,23 @@ class GuardianVpnService : VpnService() {
             .addDnsServer("10.111.0.2")            // pseudo DNS server — MUST differ
             .addRoute("10.111.0.2", 32)            // from the interface, routed to us
             .setMtu(1500)
-        // Phase 1 captures IPv4 DNS only. Advertising an IPv6 DNS server here
-        // made the phone send DNS over IPv6 to us, and any imperfect IPv6 reply
-        // triggered a retry storm (hot CPU / battery drain) on device. IPv6 DNS
-        // capture is deferred until its response path is validated on hardware.
-        // (DnsPacket still understands IPv6 — we just don't advertise it here.)
+        // IPv6 DNS capture (v1.1). The original attempt caused a retry storm on
+        // device — replies lacked the MANDATORY IPv6 UDP checksum, so the phone
+        // silently dropped every one and retried forever (hot CPU, dead battery).
+        // wrapIpv6 now computes the pseudo-header checksum and is cross-verified
+        // byte-level by build-tools/test_packets.py ("IPv6 UDP checksum valid").
+        // Same lesson as IPv4: interface address and DNS address MUST differ.
+        // Kill-switch: set IPV6_DNS=false and rebuild to fall back to v1.0.2
+        // behaviour exactly.
+        if (IPV6_DNS) {
+            try {
+                builder.addAddress("fd6e:7f3a:9c11::1", 128)
+                builder.addDnsServer("fd6e:7f3a:9c11::2")
+                builder.addRoute("fd6e:7f3a:9c11::2", 128)
+            } catch (e: Exception) {
+                Log.w(TAG, "IPv6 DNS setup failed, continuing IPv4-only: $e")
+            }
+        }
         // Don't filter Guardian's own traffic (provable zero-telemetry story).
         try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
         // User-chosen "Don't filter this app" exclusions — for apps that refuse

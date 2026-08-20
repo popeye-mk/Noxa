@@ -13,6 +13,8 @@ Noxa is a free, open, dead-simple Android app that blocks ads, trackers, and mal
 - **System-wide blocking** — a local `VpnService` DNS sinkhole checks every app's lookups against a compiled **~860,000-domain** filter (UT1 + StevenBlack + EasyList/EasyPrivacy + OISD + HaGeZi + AdGuard). Blocked domains never connect.
 - **Per-app control + plain-language stats** — see *which company* each app is tracking you for ("Google · Advertising", "Xiaomi · Analytics"), and block any app entirely with one switch.
 - **CNAME uncloaking** — catches trackers disguised as first-party subdomains that plain domain-lists miss.
+- **IPv6-proof** — DNS is captured over IPv4 *and* IPv6, so lookups can't slip around the filter on modern networks.
+- **Works on Android TV** — appears in the TV launcher; block the trackers baked into every smart-TV app.
 - **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi.
 - **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
 - **User allowlist** — un-block anything caught by mistake, yourself.
