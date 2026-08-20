@@ -218,8 +218,15 @@ class AppsActivity : Activity() {
      *  banking apps). ✓ marks currently excluded apps; tapping toggles. */
     private fun showExcludePicker() {
         val pm = packageManager
-        val launchables = pm.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+        // Phone apps live under CATEGORY_LAUNCHER, but Android TV apps (Prime
+        // Video etc.) register under CATEGORY_LEANBACK_LAUNCHER only — query
+        // BOTH or half the TV's apps are invisible to the picker.
+        val launchables = (
+            pm.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0) +
+            pm.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
+            )
             .map { it.activityInfo.packageName }.distinct()
             .filter { it != packageName }
             .map { pkg -> Pair(label(pkg), pkg) }

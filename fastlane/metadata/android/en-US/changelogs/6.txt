@@ -1,0 +1,3 @@
+• Fix: the "exclude an app" picker now lists Android TV apps too (Prime
+  Video and friends register under the TV launcher category, which the
+  picker previously didn't query)
