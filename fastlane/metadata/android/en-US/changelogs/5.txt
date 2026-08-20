@@ -1,0 +1,5 @@
+• IPv6 DNS capture — closes the last known bypass: on IPv6 networks,
+  lookups can no longer slip around the filter. Device-tested: ~2% battery
+  over 7 hours, same as before.
+• Android TV support — Noxa now appears in the TV home-screen launcher
+  (TVs are among the most tracker-heavy devices people own).
