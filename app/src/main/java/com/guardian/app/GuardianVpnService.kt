@@ -99,15 +99,34 @@ class GuardianVpnService : VpnService() {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_DOH, on).apply()
         }
+
+        // v1.2 keep-alive: remembers whether the USER wants protection on, so
+        // the watchdog can tell "killed by the OS" (restart!) apart from
+        // "turned off by the user" (leave it off).
+        private const val KEY_WANT = "protection_wanted"
+        fun wantsProtection(ctx: Context): Boolean =
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WANT, false)
+        fun setWantsProtection(ctx: Context, on: Boolean) {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_WANT, on).apply()
+        }
     }
 
     @Volatile private var dohRetryAt = 0L   // back-off clock when DoH is failing
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            setWantsProtection(this, false)      // the USER said stop —
+            WatchdogReceiver.cancel(this)        // the watchdog must not resurrect it
             stopVpn()
             return START_NOT_STICKY
         }
+        // Go foreground IMMEDIATELY: when the watchdog restarts us from the
+        // background it must use startForegroundService(), and Android kills
+        // services that don't show their notification within seconds.
+        startForeground(NOTIF_ID, buildNotification())
+        setWantsProtection(this, true)
+        WatchdogReceiver.schedule(this)
         startVpn()
         return START_STICKY
     }
@@ -165,6 +184,8 @@ class GuardianVpnService : VpnService() {
         val fd = builder.establish()
         if (fd == null) {
             Log.e(TAG, "establish() returned null — VPN not started")
+            stopForeground(true)   // don't linger as a foreground zombie
+            stopSelf()             // watchdog will retry on its next tick
             return
         }
         tunnel = fd

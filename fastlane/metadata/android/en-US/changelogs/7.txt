@@ -1,0 +1,8 @@
+Keep-alive release — protection that stays on:
+• Noxa now asks (one dialog) to be excluded from battery optimization,
+  so battery managers stop silently killing it
+• Watchdog: if the system kills protection anyway, it restarts within
+  ~15 minutes — and automatically after every reboot
+• One-tap shortcut to Android's Always-on VPN setting (the strongest
+  keep-alive of all)
+• User manual (per-brand battery steps) now ships in the repo

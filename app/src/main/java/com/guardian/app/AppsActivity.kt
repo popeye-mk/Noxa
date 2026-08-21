@@ -124,6 +124,22 @@ class AppsActivity : Activity() {
             setOnClickListener { showExcludePicker() }
         })
 
+        // v1.2 keep-alive: Always-on VPN makes ANDROID ITSELF keep Noxa running
+        // and restart it — the strongest defence against battery managers.
+        // Apps can't enable it for themselves; we can only walk the user there.
+        root.addView(Button(this).apply {
+            text = "Keep protection alive — set Always-on VPN ›"
+            setBackgroundResource(R.drawable.btn_secondary)
+            setTextColor(Color.parseColor("#8AA0B2"))
+            setOnClickListener {
+                Toast.makeText(this@AppsActivity,
+                    "Tap the gear ⚙ next to Noxa, then enable \"Always-on VPN\".",
+                    Toast.LENGTH_LONG).show()
+                try { startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS)) }
+                catch (_: Exception) {}
+            }
+        })
+
         val apps = AppStats.seenApps().sortedByDescending { AppStats.blocked[it] ?: 0L }
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         if (apps.isEmpty()) {

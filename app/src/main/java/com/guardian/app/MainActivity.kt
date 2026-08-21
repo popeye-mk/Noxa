@@ -105,9 +105,29 @@ class MainActivity : Activity() {
             startService(Intent(this, GuardianVpnService::class.java)
                 .setAction(GuardianVpnService.ACTION_START))
             status.text = getString(R.string.on)
+            askBatteryExemption()
         } else {
             toggle.isChecked = false
         }
+    }
+
+    /** v1.2 keep-alive: one system dialog ("Allow Noxa to ignore battery
+     *  optimization?") replaces six buried settings steps. Asked right after
+     *  protection first turns on — the moment the user has committed. Without
+     *  it, battery managers silently kill the VPN after a while. */
+    private fun askBatteryExemption() {
+        val pm = getSystemService(android.os.PowerManager::class.java)
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        // Ask ONCE, ever. Some OEMs (MIUI) never report the exemption as
+        // granted, which would make us nag on every start — never nag.
+        val prefs = getSharedPreferences("guardian_ui", MODE_PRIVATE)
+        if (prefs.getBoolean("battery_asked", false)) return
+        prefs.edit().putBoolean("battery_asked", true).apply()
+        try {
+            startActivity(Intent(
+                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                android.net.Uri.parse("package:$packageName")))
+        } catch (_: Exception) { /* some OEMs hide this screen — manual covers them */ }
     }
 
     private fun stopService() {
