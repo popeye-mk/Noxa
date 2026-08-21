@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- v1.2 keep-alive: lets Noxa ASK (one system dialog, user decides) to be
+         excluded from battery optimization, so protection isn't silently killed.
+         The legitimate use-case this permission exists for. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- v1.2 keep-alive: restart protection automatically after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Android TV support: TVs are among the most tracker-infested devices
          people own (ACR, ad platforms, telemetry in every streaming app) and
@@ -61,6 +67,17 @@
         <activity
             android:name=".AllowlistActivity"
             android:exported="false" />
+
+        <!-- v1.2 keep-alive watchdog: every ~15 min + after boot, restarts
+             protection if an aggressive battery manager killed it and the user
+             still wants it on. Runs entirely on-device. -->
+        <receiver
+            android:name=".WatchdogReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- The local filter. BIND_VPN_SERVICE is what lets us inspect traffic
              on-device; nothing is sent to any server. -->
