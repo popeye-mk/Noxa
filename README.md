@@ -8,6 +8,22 @@ Noxa is a free, open, dead-simple Android app that blocks ads, trackers, and mal
 
 ---
 
+## Install (2 minutes)
+
+1. On your phone, open **[the latest release](https://github.com/popeye-mk/Noxa/releases/latest)** and download the `noxa-v….apk` file
+2. Tap the downloaded file and allow the install when Android asks
+3. Open Noxa, flip the switch, allow the VPN prompt — done
+
+**Then do one more thing:** tell your phone not to kill Noxa in the
+background — takes a minute, steps for every phone brand are in the
+**[User Manual](docs/USER-MANUAL.md)** (also as [PDF](docs/Noxa-User-Manual.pdf)).
+Skipping this is the #1 reason protection "randomly" stops.
+
+Something not working? See [Troubleshooting](#troubleshooting) or the
+[User Manual](docs/USER-MANUAL.md) — and please [open an issue](https://github.com/popeye-mk/Noxa/issues).
+
+---
+
 ## What it does
 
 - **System-wide blocking** — a local `VpnService` DNS sinkhole checks every app's lookups against a compiled **~860,000-domain** filter (UT1 + StevenBlack + EasyList/EasyPrivacy + OISD + HaGeZi + AdGuard). Blocked domains never connect.
