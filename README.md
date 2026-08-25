@@ -31,6 +31,7 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **CNAME uncloaking** — catches trackers disguised as first-party subdomains that plain domain-lists miss.
 - **IPv6-proof** — DNS is captured over IPv4 *and* IPv6, so lookups can't slip around the filter on modern networks.
 - **Works on Android TV** — appears in the TV launcher; block the trackers baked into every smart-TV app.
+- **Stays on** — battery-exemption ask, a self-restarting watchdog, and automatic start after reboot: protection that doesn't silently die.
 - **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi.
 - **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
 - **User allowlist** — un-block anything caught by mistake, yourself.
@@ -67,13 +68,25 @@ The honest limits: DNS-level blocking can't hide same-domain/cosmetic ads (pair 
 
 ## Troubleshooting
 
-A few apps refuse to start when their startup analytics beacon is blocked —
-that's them, not you. Noxa ships with a tiny "app compatibility" set of
-allowlist entries (visible and deletable in **Allowed sites**) covering the
-known ones: Disney+ (error 142, `disneystreaming.com`) and Prime Video on
-Android TV (`device-metrics-us.amazon.com`). If another app misbehaves with
-Noxa on, add its domain to **Allowed sites** — and please open an issue so it
-can help everyone.
+**An app shows "no internet" or won't connect while Noxa is on** (Android
+Auto, some streaming and banking apps — they refuse to run when they detect
+a VPN): **Per-app details → "App won't work with Noxa on? Exclude it"** →
+pick the app → toggle protection off and on. The excluded app bypasses Noxa
+entirely — it works, the rest of the phone stays protected.
+
+**A site or service is wrongly blocked:** add its address in **Per-app
+details → Allowed sites** — it will never be blocked again. Noxa ships with
+a small compatibility set already (visible and deletable there) for apps
+that hang when their startup beacon is blocked: Disney+ (error 142) and
+Prime Video on Android TV.
+
+**Protection silently stops after a while:** your phone's battery manager is
+killing it. Noxa asks for a battery exemption, restarts itself every ~15
+minutes and after reboots — but aggressive brands need one or two extra
+taps (Xiaomi: enable Autostart). Per-brand steps: [User Manual](docs/USER-MANUAL.md).
+
+Hit something new? Please [open an issue](https://github.com/popeye-mk/Noxa/issues)
+— your fix helps everyone.
 
 ## Not affiliated
 
