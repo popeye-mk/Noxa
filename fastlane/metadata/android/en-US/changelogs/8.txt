@@ -1,0 +1,4 @@
+• TV navigation fix: buttons, inputs and list rows now show a clear violet
+  focus highlight when moving with the remote / D-pad
+• Android Auto can now be excluded: it has no launcher icon, so the
+  "exclude an app" picker couldn't see it before

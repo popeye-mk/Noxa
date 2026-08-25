@@ -1,11 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Standard dark button: rounded card look with a thin edge + spacing. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:top="6dp" android:bottom="6dp">
-        <shape>
-            <corners android:radius="14dp" />
-            <solid android:color="#1C2438" />
-            <stroke android:width="1dp" android:color="#2D3A58" />
-        </shape>
+<!-- Standard dark button with a clearly visible focused state for TV/D-pad. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item android:top="6dp" android:bottom="6dp">
+                <shape>
+                    <corners android:radius="14dp" />
+                    <solid android:color="#28345A" />
+                    <stroke android:width="3dp" android:color="#7C5CFF" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
-</layer-list>
+    <item>
+        <layer-list>
+            <item android:top="6dp" android:bottom="6dp">
+                <shape>
+                    <corners android:radius="14dp" />
+                    <solid android:color="#1C2438" />
+                    <stroke android:width="1dp" android:color="#2D3A58" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

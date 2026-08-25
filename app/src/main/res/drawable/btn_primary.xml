@@ -1,11 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Primary action: the icon's indigo→violet, rounded, with built-in spacing. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:top="6dp" android:bottom="6dp">
-        <shape>
-            <corners android:radius="14dp" />
-            <gradient android:angle="0"
-                android:startColor="#5B5BD6" android:endColor="#7C5CFF" />
-        </shape>
+<!-- Primary action button. The FOCUSED state (TV remote / D-pad) gets a bright
+     white edge — on a TV the focus ring IS the cursor, it must be obvious. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item android:top="6dp" android:bottom="6dp">
+                <shape>
+                    <corners android:radius="14dp" />
+                    <gradient android:angle="0"
+                        android:startColor="#6B6BE6" android:endColor="#8C6CFF" />
+                    <stroke android:width="3dp" android:color="#FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
-</layer-list>
+    <item>
+        <layer-list>
+            <item android:top="6dp" android:bottom="6dp">
+                <shape>
+                    <corners android:radius="14dp" />
+                    <gradient android:angle="0"
+                        android:startColor="#5B5BD6" android:endColor="#7C5CFF" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

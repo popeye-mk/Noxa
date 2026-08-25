@@ -31,6 +31,9 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
+        <!-- Headless apps (no launcher icon) that users may need to exclude:
+             they never show up in the launcher queries above. -->
+        <package android:name="com.google.android.projection.gearhead" />
     </queries>
 
     <application
