@@ -182,10 +182,13 @@ class AppsActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, dp(10))
+            setPadding(dp(8), dp(10), dp(8), dp(10))
             addView(col)
             addView(block)
             setOnClickListener { showDetail(name, pkg) }
+            // TV/D-pad: rows must take focus and SHOW it, or remote users are lost.
+            isFocusable = true
+            setBackgroundResource(R.drawable.row_focus)
         }
     }
 
@@ -237,13 +240,20 @@ class AppsActivity : Activity() {
         // Phone apps live under CATEGORY_LAUNCHER, but Android TV apps (Prime
         // Video etc.) register under CATEGORY_LEANBACK_LAUNCHER only — query
         // BOTH or half the TV's apps are invisible to the picker.
+        // Headless apps with no launcher icon that users commonly need to
+        // exclude (they'd otherwise be invisible to this picker). Each must
+        // also be declared in the manifest <queries> block.
+        val headless = listOf("com.google.android.projection.gearhead") // Android Auto
+            .filter { pkg -> try { pm.getApplicationInfo(pkg, 0); true } catch (e: Exception) { false } }
         val launchables = (
             pm.queryIntentActivities(
                 Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0) +
             pm.queryIntentActivities(
                 Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
             )
-            .map { it.activityInfo.packageName }.distinct()
+            .map { it.activityInfo.packageName }
+            .plus(headless)
+            .distinct()
             .filter { it != packageName }
             .map { pkg -> Pair(label(pkg), pkg) }
             .sortedBy { it.first.lowercase() }

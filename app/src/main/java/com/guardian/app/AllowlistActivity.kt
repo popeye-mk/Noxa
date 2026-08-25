@@ -80,7 +80,10 @@ class AllowlistActivity : Activity() {
             col.addView(TextView(this).apply {
                 text = "  ✓  $d      (tap to remove)"
                 setTextColor(Color.parseColor("#4CC38A")); textSize = 15f
-                setPadding(0, dp(10), 0, dp(10))
+                setPadding(dp(8), dp(10), dp(8), dp(10))
+                // TV/D-pad: entries must take focus and show it.
+                isFocusable = true
+                setBackgroundResource(R.drawable.row_focus)
                 setOnClickListener {
                     AppStats.removeUserAllow(this@AllowlistActivity, d)
                     Toast.makeText(this@AllowlistActivity, "Removed.", Toast.LENGTH_SHORT).show()
