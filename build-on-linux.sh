@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# Guardian — one-shot APK builder for Linux.
+# Noxa — one-shot APK builder for Linux.
 #
-# Run this ON YOUR OWN PC (not inside Claude). It downloads everything it needs
-# into ~/.guardian-build (no admin/root required), compiles the app, and leaves
-# an installable file at:
-#     app/build/outputs/apk/debug/app-debug.apk
+# Downloads everything it needs into ~/.guardian-build (no admin/root
+# required), compiles the app, and leaves an installable APK at:
+#     debug   : app/build/outputs/apk/debug/app-debug.apk
+#     release : app/build/outputs/apk/release/app-release.apk
 #
 # Usage:
-#     cd <the privacy folder>
-#     bash build-on-linux.sh
+#     bash build-on-linux.sh            # debug build (quick testing)
+#     bash build-on-linux.sh release    # signed release build (for users;
+#                                       # needs keystore.properties — see
+#                                       # docs/FDROID-AND-RELEASE.md)
 #
 # Needs: internet, curl, unzip, tar (all standard on Ubuntu). If a step errors,
 # copy the last ~15 lines of output back to Claude and it'll fix it.
@@ -91,7 +93,7 @@ if [ -f "$APK" ]; then
   echo "Install it on the plugged-in phone (USB debugging on):"
   echo "    $SDK/platform-tools/adb install -r \"$APK\""
   echo ""
-  echo "…or just copy app-debug.apk onto the phone and tap it to install."
+  echo "…or just copy the APK onto the phone and tap it to install."
 else
   echo "Build finished but no APK was produced — copy the output above to Claude."
 fi
