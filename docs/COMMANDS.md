@@ -6,6 +6,38 @@ Everything runs from the project folder:
 
 ---
 
+## The clean path (how changes ship without breaking anyone)
+
+**`main` is the workshop; tags are the shop window.** Users and F-Droid
+only ever install *tagged releases* — a published tag (v1.2.2 …) is frozen
+forever and cannot be broken by later work. So:
+
+1. Make changes on main (commit + push freely — nobody installs from main)
+2. Build and TEST ON A REAL PHONE (`bash build-on-linux.sh release`,
+   install on the guinea-pig phone first)
+3. Verify the fix/feature actually works — files exist, behavior observed
+4. Only then: bump versionCode/Name, changelog file, tag, release
+5. If something goes wrong mid-work: `git checkout vX.Y.Z` restores any
+   released state; `backups/*.tgz` is the fire escape
+
+Never tag untested code. Never fix things directly in a tag.
+
+### Pre-release test matrix (BOTH modes, every release)
+
+Features pass alone and still break together — the v1.2 keep-alive was
+tested in blocker mode only and silently broke the tunnel for 4 days.
+Before every tag, on the guinea-pig phone:
+
+- [ ] Blocker mode: switch on → notification shows, counter climbs,
+      ad-block test scores normally
+- [ ] Tunnel mode: tunnel on (block toggle on) → whatsmyip shows the
+      PROVIDER's IP, ad-block test still scores well
+- [ ] Tunnel endurance: leave tunnel up 20+ min → IP still hidden
+      (keep-alive must NOT re-grab the VPN slot)
+- [ ] Switch back: tunnel off → blocker on → counter resumes
+
+---
+
 ## Build the app
 
     bash build-on-linux.sh              # debug build (testing)

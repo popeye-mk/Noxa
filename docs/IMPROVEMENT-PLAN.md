@@ -88,6 +88,17 @@ A domain Bloom filter can't catch randomized rotating subdomains
   user-configurable, not a general regex engine).
 - Only add patterns backed by an observed miss on a real device or test.
 
+## v2.0 ambition: Noxa's own filter INSIDE the tunnel
+
+Today, tunnel mode and blocker mode share Android's single VPN slot: while
+the WireGuard tunnel is up, blocking happens via AdGuard's resolver inside
+the tunnel — solid, but not our 900k list, and our counter/per-app stats
+pause. The real solution is ONE VpnService that does both jobs: WireGuard
+transport + our DNS filter in the same pipeline (the RethinkDNS-class
+architecture). Weeks of careful work; the single most valuable feature on
+the long-term roadmap. Until then the modes stay separate and honest about
+it (UI says counter pauses in tunnel mode).
+
 ## Honest limits (unchanged by any of this)
 
 Same-domain/cosmetic ads and in-service tracking while logged in are
