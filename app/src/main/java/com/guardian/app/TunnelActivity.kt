@@ -203,8 +203,10 @@ class TunnelActivity : Activity() {
             try {
                 TunnelController.up(this, cfg, block)
                 runOnUiThread {
-                    wgStatus.text = if (block) "Tunnel ON — IP hidden + trackers blocked."
-                                    else "Tunnel ON — IP hidden."
+                    wgStatus.text = if (block)
+                        "Tunnel ON — IP hidden; ads & trackers blocked in-tunnel " +
+                        "(via AdGuard DNS — Noxa's counter pauses in tunnel mode)."
+                    else "Tunnel ON — IP hidden. (Noxa's blocking & counter pause in tunnel mode.)"
                 }
             } catch (e: Exception) {
                 Log.w("Guardian", "tunnel up failed: $e")

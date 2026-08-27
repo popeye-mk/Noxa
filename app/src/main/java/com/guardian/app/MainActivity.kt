@@ -90,7 +90,12 @@ class MainActivity : Activity() {
         toggle.setOnCheckedChangeListener(null)      // don't fire the listener while syncing
         toggle.isChecked = on
         toggle.setOnCheckedChangeListener(toggleListener)
-        status.text = getString(if (on) R.string.on else R.string.off)
+        // Tunnel mode holds Android's single VPN slot: blocking happens inside
+        // the tunnel via AdGuard DNS, so Noxa's own counter pauses. Say so,
+        // instead of looking "off" while the user is actually protected.
+        status.text = if (!on && TunnelController.isUp)
+            "Tunnel mode — IP hidden, ads blocked in-tunnel (counter paused)"
+        else getString(if (on) R.string.on else R.string.off)
     }
 
     private fun requestStart() {
