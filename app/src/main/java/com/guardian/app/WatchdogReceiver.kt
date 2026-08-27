@@ -27,6 +27,7 @@ class WatchdogReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) schedule(ctx)
         if (!GuardianVpnService.wantsProtection(ctx)) return   // user turned it off
         if (GuardianVpnService.isRunning.get()) return          // alive — nothing to do
+        if (TunnelController.isUp) return   // the user's TUNNEL holds the VPN slot — never steal it
         if (VpnService.prepare(ctx) != null) return             // permission revoked — needs the app UI
         val svc = Intent(ctx, GuardianVpnService::class.java)
             .setAction(GuardianVpnService.ACTION_START)

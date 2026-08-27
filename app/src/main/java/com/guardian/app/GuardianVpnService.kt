@@ -125,6 +125,19 @@ class GuardianVpnService : VpnService() {
         // background it must use startForegroundService(), and Android kills
         // services that don't show their notification within seconds.
         startForeground(NOTIF_ID, buildNotification())
+        // NEVER steal the one VPN slot from the user's WireGuard tunnel: a
+        // sticky/watchdog restart while the tunnel is up would silently kick
+        // it off — "IP hidden" on screen, real IP on the wire. Refuse.
+        if (TunnelController.isUp) {
+            stopForeground(true); stopSelf()
+            return START_NOT_STICKY
+        }
+        // A null intent is Android sticky-restarting us after a kill. Honour
+        // the user's last choice: if they had turned protection off, stay off.
+        if (intent == null && !wantsProtection(this)) {
+            stopForeground(true); stopSelf()
+            return START_NOT_STICKY
+        }
         setWantsProtection(this, true)
         WatchdogReceiver.schedule(this)
         startVpn()
