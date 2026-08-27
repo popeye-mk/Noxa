@@ -1,0 +1,4 @@
+• Fix: the keep-alive watchdog could silently steal the VPN slot from the
+  "Hide my IP" WireGuard tunnel (screen said tunnel ON, but your real IP
+  showed). The blocker now never starts while the tunnel is up, and
+  respects your last on/off choice after system restarts.
