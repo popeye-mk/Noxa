@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- List rows (apps, allowlist entries): invisible normally, glowing card when
-     the TV remote / D-pad focus lands on them. -->
+<!-- App rows: transparent normally, a lifted glowing card when the TV remote /
+     D-pad focus lands on them. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape>
             <corners android:radius="12dp" />
-            <solid android:color="#22304F" />
-            <stroke android:width="2dp" android:color="#7C5CFF" />
+            <solid android:color="#3A4A70" />
+            <stroke android:width="2dp" android:color="#8C6CFF" />
         </shape>
     </item>
     <item>
