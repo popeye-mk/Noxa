@@ -1,0 +1,7 @@
+A friendlier Noxa — same protection, simpler to use:
+• Redesigned "Who's tracking you" screen — real app icons, plain names,
+  and every app's blocked count at a glance
+• All the technical controls tucked into one calm "Settings & tools" menu
+• Softer, lighter look (no more near-black)
+• The main switch now stays ON in tunnel mode — clearly shows you're still
+  protected (IP hidden) instead of looking switched off

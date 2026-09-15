@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Night-sky gradient matching the crescent-moon icon (indigo → deep navy). -->
+<!-- Softer slate-indigo night sky (lifted from near-black so the app feels
+     calm, not oppressive). Still matches the crescent-moon icon. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <gradient
         android:angle="270"
-        android:startColor="#171E36"
-        android:centerColor="#101527"
-        android:endColor="#0A0D17" />
+        android:startColor="#334062"
+        android:centerColor="#283350"
+        android:endColor="#202942" />
 </shape>

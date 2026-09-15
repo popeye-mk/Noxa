@@ -26,8 +26,19 @@ class MainActivity : Activity() {
     private lateinit var counter: TextView
     private val ui = Handler(Looper.getMainLooper())
 
+    // The main switch means "am I protected?" — ON if EITHER the blocker or the
+    // tunnel is active. Turning it OFF stops whichever one is running.
     private val toggleListener = CompoundButton.OnCheckedChangeListener { _, checked ->
-        if (checked) requestStart() else stopService()
+        if (checked) {
+            requestStart()
+        } else if (TunnelController.isUp) {
+            // Protected by the tunnel — turning the master switch off stops it.
+            status.text = getString(R.string.off)
+            status.setTextColor(android.graphics.Color.parseColor("#8FA0BC"))
+            Thread { TunnelController.down(this@MainActivity) }.start()
+        } else {
+            stopService()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,16 +97,29 @@ class MainActivity : Activity() {
      *  it may be running because Always-on VPN started it without the app open. */
     override fun onResume() {
         super.onResume()
-        val on = GuardianVpnService.isRunning.get()
-        toggle.setOnCheckedChangeListener(null)      // don't fire the listener while syncing
-        toggle.isChecked = on
+        val blockerOn = GuardianVpnService.isRunning.get()
+        val tunnelOn = TunnelController.isUp
+        val protectedNow = blockerOn || tunnelOn      // ON = protected by EITHER
+        toggle.setOnCheckedChangeListener(null)       // don't fire the listener while syncing
+        toggle.isChecked = protectedNow
         toggle.setOnCheckedChangeListener(toggleListener)
-        // Tunnel mode holds Android's single VPN slot: blocking happens inside
-        // the tunnel via AdGuard DNS, so Noxa's own counter pauses. Say so,
-        // instead of looking "off" while the user is actually protected.
-        status.text = if (!on && TunnelController.isUp)
-            "Tunnel mode — IP hidden, ads blocked in-tunnel (counter paused)"
-        else getString(if (on) R.string.on else R.string.off)
+        // The switch stays ON in tunnel mode (you ARE protected) — it must never
+        // slide to "off" and look like protection died just because the blocker
+        // handed the single VPN slot to the tunnel.
+        when {
+            tunnelOn -> {
+                status.text = "🌐  Protected — tunnel mode, your IP is hidden"
+                status.setTextColor(android.graphics.Color.parseColor("#4CC38A"))
+            }
+            blockerOn -> {
+                status.text = getString(R.string.on)
+                status.setTextColor(android.graphics.Color.parseColor("#4CC38A"))
+            }
+            else -> {
+                status.text = getString(R.string.off)
+                status.setTextColor(android.graphics.Color.parseColor("#8FA0BC"))
+            }
+        }
     }
 
     private fun requestStart() {
