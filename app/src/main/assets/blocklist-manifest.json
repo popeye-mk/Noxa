@@ -1,18 +1,18 @@
 {
   "format": "GBF1",
-  "built_at": "2026-09-30 21:21:58",
+  "built_at": "2026-09-30 22:13:56",
   "false_positive_target": 1e-06,
-  "sha256": "1a85088a8699a9e73509e56e6a92ae5cc1ab9aca64d63fbc629a0e535c782eaa",
+  "sha256": "6c1c257c34817da01b638cd9784969393a1cc511dc6d72b6f22c4fecb0975019",
   "stalkerware_sha256": "6c8f65f5db907dd75155aa5d4071b0da777d41ed396ceb4178885a7ad84af2c9",
   "stalkerware_domains": 525,
   "bloom": {
-    "m_bits": 24814624,
+    "m_bits": 24815027,
     "k_hashes": 20,
     "size_mb": 2.958,
-    "items": 862962
+    "items": 862976
   },
-  "unique_domains": 862962,
-  "raw_total": 1606084,
+  "unique_domains": 862976,
+  "raw_total": 1606099,
   "protection_categories": {
     "publicite": 4269,
     "malware": 243251,
@@ -30,9 +30,9 @@
   },
   "extra_sources": {
     "stevenblack": 74761,
-    "easyprivacy": 47171,
-    "easylist": 49031,
-    "oisd": 245226,
+    "easyprivacy": 47173,
+    "easylist": 49045,
+    "oisd": 245225,
     "hagezi_pro": 230960,
     "adguard_dns": 176230,
     "hagezi_doh": 3336,
