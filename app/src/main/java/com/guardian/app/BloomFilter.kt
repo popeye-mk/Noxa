@@ -30,6 +30,11 @@ class BloomFilter private constructor(
     fun contains(domain: String): Boolean {
         val d = domain.trim().lowercase()
         if (d.isEmpty()) return false
+        return containsNormalized(d)
+    }
+
+    /** [d] is already trimmed + lowercased (hot path: skip re-normalising). */
+    private fun containsNormalized(d: String): Boolean {
         val h = sha256(d)
         // h1, h2 are UNSIGNED 64-bit values. Reduce each mod m FIRST (unsigned),
         // then combine mod m. This avoids 64-bit overflow and reproduces the
@@ -55,12 +60,15 @@ class BloomFilter private constructor(
      *      ads.a.tracker.com, a.tracker.com, tracker.com
      */
     fun matchesHostOrParent(host: String): Boolean {
-        var h = host.trim().lowercase().removeSuffix(".")
-        while (h.contains('.')) {
-            if (contains(h)) return true
-            h = h.substring(h.indexOf('.') + 1)
+        val h = host.trim().lowercase().removeSuffix(".")
+        if (h.isEmpty()) return false
+        var start = 0
+        while (true) {
+            val dot = h.indexOf('.', start)
+            if (dot < 0) return false                // no dot left: a bare TLD, never checked
+            if (containsNormalized(if (start == 0) h else h.substring(start))) return true
+            start = dot + 1
         }
-        return false
     }
 
     companion object {
@@ -79,23 +87,46 @@ class BloomFilter private constructor(
             return load(ctx.assets.open("guardian-default.gbf"))
         }
 
-        /** Load from an InputStream (e.g. assets.open("guardian-default.gbf")). */
+        /** Load from an InputStream (e.g. assets.open("guardian-default.gbf")).
+         *  Reads the 24-byte header, then the bit array straight into ONE
+         *  exactly-sized array (no whole-file copy: ~3 MB less peak memory). */
         fun load(input: InputStream): BloomFilter {
-            input.use { stream ->
-                val bytes = stream.readBytes()
-                require(bytes.size >= 24) { "gbf file too small" }
-                val magic = String(bytes, 0, 4, Charsets.US_ASCII)
+            java.io.DataInputStream(input.buffered()).use { stream ->
+                val header = ByteArray(24)
+                stream.readFully(header)
+                val magic = String(header, 0, 4, Charsets.US_ASCII)
                 require(magic == MAGIC) { "bad magic: $magic" }
-                val k = leInt(bytes, 4)
-                val m = leLong(bytes, 8)
-                val items = leLong(bytes, 16)
-                val body = bytes.copyOfRange(24, bytes.size)
+                val k = leInt(header, 4)
+                val m = leLong(header, 8)
+                val items = leLong(header, 16)
+                require(k in 1..64 && m > 0 && (m + 7) / 8 <= Int.MAX_VALUE) { "bad gbf header" }
+                val body = ByteArray(((m + 7) / 8).toInt())
+                // A truncated file fails here (EOFException); trailing junk fails
+                // below — either way loadCurrent() falls back to the bundled list.
+                stream.readFully(body)
+                require(stream.read() == -1) { "gbf size/header mismatch" }
                 return BloomFilter(k, m, items, body)
             }
         }
 
+        /** Header sanity: sensible k, and the body is exactly ceil(m/8) bytes. */
+        fun isValidHeader(k: Int, mBits: Long, fileSize: Long): Boolean =
+            k in 1..64 && mBits > 0 && fileSize - 24 == (mBits + 7) / 8
+
+        /** Same check on raw file bytes (used before accepting a download). */
+        fun isValidFile(bytes: ByteArray): Boolean =
+            bytes.size >= 24 && String(bytes, 0, 4, Charsets.US_ASCII) == MAGIC &&
+                isValidHeader(leInt(bytes, 4), leLong(bytes, 8), bytes.size.toLong())
+
+        // One digest per thread (the tun loop + resolver workers), reused for
+        // every lookup instead of a provider lookup + allocation per hash.
+        // (initialValue override, not ThreadLocal.withInitial: that's API 26+, minSdk is 24.)
+        private val digest = object : ThreadLocal<MessageDigest>() {
+            override fun initialValue(): MessageDigest = MessageDigest.getInstance("SHA-256")
+        }
+
         private fun sha256(s: String): ByteArray =
-            MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8))
+            digest.get()!!.digest(s.toByteArray(Charsets.UTF_8))   // digest() also resets it
 
         private fun leInt(b: ByteArray, off: Int): Int {
             var v = 0

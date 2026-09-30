@@ -1,0 +1,8 @@
+Faster, smoother browsing — same protection:
+• Lookups no longer wait in line: one slow answer (bad Wi-Fi) can
+  no longer freeze every other app
+• Remembers recent answers for a few minutes, so repeat visits load
+  instantly and use less battery and data
+• Fixed a rare mix-up where a late answer could reach the wrong app
+• Encrypted DNS recovers faster after a network hiccup
+• Downloaded blocklist updates are now integrity-checked

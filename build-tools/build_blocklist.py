@@ -131,6 +131,18 @@ ALLOWLIST_DOMAINS = [
     "brave-core-ext.s3.brave.com",
 ]
 
+# Curated tracking-only endpoints that are ALWAYS blocked, whatever the
+# upstream lists contain this week. Keep this tiny and tracking-only: never an
+# app's core domain (verify_build.py's MUST_ALLOW enforces that). Added AFTER
+# the allowlist, so an entry here is deliberate and wins.
+ALWAYS_BLOCK_DOMAINS = [
+    "connect.facebook.net",   # Meta Pixel / JS SDK loader on third-party sites
+    "pixel.facebook.com",     # Meta Pixel beacon
+    "an.facebook.com",        # Meta Audience Network (ads in other apps)
+    "udc.yahoo.com",          # Yahoo "user data collection" telemetry — the one
+                              # host the adblock.turtlecute.org test still caught
+]
+
 # --- Bloom filter parameters -------------------------------------------------
 # p = target false-positive rate. Lower = fewer legit domains wrongly blocked,
 # at the cost of a slightly bigger file and more hashes per lookup.
@@ -150,6 +162,10 @@ def normalize(line: str):
             s = s[len(pfx):]
     s = s.split("/")[0].split(":")[0].strip()
     if "." not in s or " " in s:
+        return None
+    # An IP address is not a domain: the app only ever checks looked-up NAMES,
+    # so an IP entry (e.g. EasyPrivacy's 127.0.0.1) only wastes filter space.
+    if s.replace(".", "").isdigit():
         return None
     return s
 
@@ -187,7 +203,11 @@ EXTRA_SOURCES = {
     "hagezi_doh":     ("blocklists/hagezi/doh.txt",           "adblock"),  # DoH/DoT bypass
     # Improvement plan phase 1 — targeted at MEASURED gaps (social SDK 88%):
     "dandelion_am":   ("blocklists/dandelion/antimalware.txt","adblock"),  # Anti-Malware
-    "facebook_sdk":   ("blocklists/social/facebook.txt",      "domains"),  # Meta pixel/SDK
+    # "facebook_sdk" (jmdugan corporations/facebook/all) REMOVED: it's a hosts
+    # file that blocks all of Facebook/Instagram/WhatsApp/Messenger — it only
+    # ever contributed a handful of domains because it was parsed as the wrong
+    # format. Meta trackers stay covered by the lists above. verify_build.py
+    # now refuses any filter that blocks Meta's core apps.
     "nocoin":         ("blocklists/nocoin/hosts.txt",         "hosts"),    # cryptomining
     "phishing_army":  ("blocklists/phishing/phishing_army.txt","domains"), # phishing
 }
@@ -230,6 +250,16 @@ def read_adblock(path):
             # drop the option suffix first (e.g. '||host^$third-party')
             d_i = body.find("$")
             if d_i != -1:
+                # A rule limited to SPECIFIC sites ('$domain=a.com|b.com') means
+                # "block this only while visiting a.com or b.com". DNS can't know
+                # which site you're on, so applying it would block the host
+                # EVERYWHERE — that's how akamaihd.net, cloudfront.net, t.co,
+                # imgur.com, bit.ly and Firebase ended up fully blocked (from
+                # e.g. '||akamaihd.net^$image,domain=globalnews.ca|nycgo.com').
+                # Skip those. Exclusion-only lists ('domain=~a.com' = "everywhere
+                # except a.com") still mean "block", so they're kept.
+                if _site_restricted(body[d_i + 1:]):
+                    continue
                 body = body[:d_i]
             # A '/' before the host terminator means this is a PATH-specific rule
             # (e.g. '||google.com/pagead/ads.js' = block one script, not the site).
@@ -252,6 +282,15 @@ def read_adblock(path):
             if d:
                 out.append(d)
     return out
+
+
+def _site_restricted(options: str) -> bool:
+    """True if Adblock options restrict the rule to particular sites."""
+    for opt in options.split(","):
+        opt = opt.strip()
+        if opt.startswith("domain="):
+            return any(d and not d.startswith("~") for d in opt[len("domain="):].split("|"))
+    return False
 
 
 def read_domains(path):
@@ -359,6 +398,11 @@ def main():
     all_domains -= allow
     print("  allowlist: %d domains ; removed %d from blocklist"
           % (len(allow), before - len(all_domains)))
+    added = [d for d in ALWAYS_BLOCK_DOMAINS if d not in all_domains]
+    all_domains.update(ALWAYS_BLOCK_DOMAINS)
+    per_cat["curated_always_block"] = len(ALWAYS_BLOCK_DOMAINS)
+    print("  curated always-block: %d domains (%d not already listed)"
+          % (len(ALWAYS_BLOCK_DOMAINS), len(added)))
 
     n = len(all_domains)
     raw_total = sum(per_cat.values())
@@ -374,6 +418,8 @@ def main():
     t0 = time.time()
     ba = build_bloom(domains, m_bits, k)
     write_gbf(os.path.join(OUT, "guardian-default.gbf"), m_bits, k, n, ba)
+    with open(os.path.join(OUT, "guardian-default.gbf"), "rb") as f:
+        gbf_sha256 = hashlib.sha256(f.read()).hexdigest()
     build_s = time.time() - t0
 
     with open(os.path.join(OUT, "merged-domains.txt"), "w") as f:
@@ -383,12 +429,14 @@ def main():
         "format": "GBF1",
         "built_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "false_positive_target": FALSE_POSITIVE_RATE,
+        "sha256": gbf_sha256,   # app verifies downloads against this
         "bloom": {"m_bits": m_bits, "k_hashes": k,
                   "size_mb": round(size_mb, 3), "items": n},
         "unique_domains": n,
         "raw_total": raw_total,
         "protection_categories": {c: per_cat[c] for c in PROTECTION_CATEGORIES},
         "extra_sources": {name: per_cat.get(name, 0) for name in EXTRA_SOURCES},
+        "curated_always_block": len(ALWAYS_BLOCK_DOMAINS),
         "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); "
                    "idx_i=(h1 + i*h2) mod m, i in 0..k-1",
     }

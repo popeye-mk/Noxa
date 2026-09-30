@@ -170,7 +170,7 @@ object DnsPacket {
     }
 
     /** Advance past a (possibly compressed) name; returns the next offset. */
-    private fun skipName(p: ByteArray, start: Int, len: Int): Int {
+    fun skipName(p: ByteArray, start: Int, len: Int): Int {
         var pos = start
         var guard = 0
         while (pos in 0 until len && guard++ < 128) {

@@ -34,7 +34,12 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Stays on** — battery-exemption ask, a self-restarting watchdog, and automatic start after reboot: protection that doesn't silently die.
 - **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi.
 - **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
-- **User allowlist** — un-block anything caught by mistake, yourself.
+- **Watch it live** — see every app's lookups as they happen; tap one to allow or block that site on the spot. Kept in memory only, never saved.
+- **Your own lists** — *Allowed sites* (never block) and *My blocked sites* (always block), editable any time.
+- **Home-screen widget + 7-day chart** — status, blocked-today and an on/off button on your home screen; a week of blocked trackers at a glance.
+- **Fresh lists every week** — a GitHub Action rebuilds the filter from every source each Monday and ships it only if strict safety checks pass (no false negatives, no blocked banks/connectivity/messaging apps, no suspicious size swings). Phones pick it up by themselves.
+- **Backup & restore** — save your allowed/blocked sites and app settings to a file, restore them on a new phone.
+- **Quick Settings tile + "Pause 5 min"** — on/off from the pull-down shade; a one-tap timed pause in the notification that turns itself back on.
 - **30-day rolling stats**, CSV export, first-run explainer.
 - **Zero telemetry, verifiable.** No location permission, no accounts, nothing phones home.
 
@@ -54,7 +59,7 @@ Noxa is a **local filter built on Android's `VpnService`** — not a real VPN by
 
 **Command line (Linux):** `bash build-on-linux.sh` fetches a JDK 17 + the Android SDK + Gradle into a local folder in your home directory and produces `app/build/outputs/apk/debug/app-debug.apk`.
 
-The compiled blocklist ships in `app/src/main/assets/guardian-default.gbf`, so the app builds without the raw lists. To **rebuild the filter**, download the sources (see `docs/`) and run `python3 build-tools/build_blocklist.py`. The build is cross-checked by `build-tools/test_filter.py`, `verify_kotlin_math.py`, and `test_packets.py`.
+The compiled blocklist ships in `app/src/main/assets/guardian-default.gbf`, so the app builds without the raw lists. To **rebuild the filter**, download the sources (see `docs/`) and run `python3 build-tools/build_blocklist.py`. The build is cross-checked by `build-tools/test_filter.py`, `verify_kotlin_math.py`, `test_packets.py` and `test_site_coverage.py` (ad-block test score); the app's own unit tests (`app/src/test`) run with `./gradlew testDebugUnitTest` and on every push in GitHub Actions.
 
 ---
 

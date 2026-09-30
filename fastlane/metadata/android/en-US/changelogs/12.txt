@@ -1,0 +1,9 @@
+Watch it live — and fix things in one tap:
+• NEW "Watch it live": see every app's lookups as they happen. Tap a
+  line to allow a site you need or block one you don't (memory only,
+  never saved)
+• NEW "My blocked sites": your own always-block list
+• NEW Quick Settings tile: turn Noxa on/off from the pull-down shade
+• NEW "Pause 5 min" in the notification — turns itself back on
+• Blocklist updates now apply instantly, no off/on needed
+• Lighter on battery and memory
