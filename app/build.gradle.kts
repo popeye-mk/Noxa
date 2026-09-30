@@ -28,6 +28,17 @@ android {
     }
 
     signingConfigs {
+        // TEST builds: a fixed, public key checked into the repo (password
+        // "android", like Android's own default debug key) so every test APK —
+        // from CI or any PC — installs OVER the previous one instead of
+        // "package conflicts". It signs only "Noxa TEST"; real releases use
+        // the private key below.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "noxadebug"
+            keyPassword = "android"
+        }
         if (keystoreProps.isNotEmpty()) {
             create("release") {
                 storeFile = rootProject.file(keystoreProps["storeFile"] as String)
@@ -44,6 +55,7 @@ android {
         debug {
             applicationIdSuffix = ".test"
             versionNameSuffix = "-test"
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             // No minification: keeps the build reproducible/auditable — anyone
