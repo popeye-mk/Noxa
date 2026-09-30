@@ -16,7 +16,7 @@ change to the one-switch experience or the zero-telemetry guarantee.
 | # | Item | Status |
 |---|------|--------|
 | 1 | Targeted new lists | TODO — next up |
-| 2 | Weekly auto-rebuild (GitHub Action) | TODO — next up |
+| 2 | Weekly auto-rebuild (GitHub Action) | **DONE — v1.6** (`rebuild-filter.yml`, gated by `verify_build.py`) |
 | 3 | Multi-hop CNAME uncloaking | **DONE — verified already covered** |
 | 4 | Wildcard/pattern rule layer | LATER — hot-path change, do carefully |
 | 5 | Resolver speed (workers, cache, ID check, DoH back-off) | **DONE — v1.4** |
@@ -33,10 +33,12 @@ Add to `build-tools/build_blocklist.py` EXTRA_SOURCES:
 - **Dandelion Sprout Anti-Malware** — malware/PUP domains the general ad
   lists don't prioritize.
   `https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Alternate%20versions%20Anti-Malware%20List/AntiMalwareAdGuardHome.txt` (adblock format)
-- **Meta/Facebook pixel & SDK** — the measured 88% category. Use the
-  actively maintained standalone list:
-  `https://raw.githubusercontent.com/jmdugan/blocklists/master/corporations/facebook/all` (hosts-like, bare domains)
-  plus HaGeZi's `native.` tracker lists if needed.
+- **Meta/Facebook pixel & SDK** — the measured 88% category.
+  ⚠️ NOT `jmdugan/blocklists/.../facebook/all`: that list blocks ALL of
+  Facebook, Instagram, WhatsApp and Messenger (it was only harmless because
+  it was parsed in the wrong format). Removed in v1.6; `verify_build.py`
+  now refuses any filter that blocks Meta's core apps. Use tracker-only
+  lists (e.g. HaGeZi `native.` lists) if the gap needs closing.
 - **NoCoin** (cryptomining):
   `https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/hosts.txt` (hosts format)
 - **Phishing Army** (extended):

@@ -30,11 +30,18 @@ MUST_ALLOW = [
     "clients3.google.com", "captive.apple.com", "quad9.net",
     "mullvad.net", "protonvpn.com", "proton.me", "ivpn.net",
     "raw.githubusercontent.com",   # the app's own filter-update source
+    # Everyday apps: a list that blocks these breaks people's phones. Their
+    # TRACKING endpoints (connect.facebook.net, pixels...) are blocked
+    # separately and are not on this list.
+    "facebook.com", "www.facebook.com", "m.facebook.com", "edge-chat.facebook.com",
+    "instagram.com", "www.instagram.com", "i.instagram.com",
+    "whatsapp.com", "web.whatsapp.com", "g.whatsapp.net", "mmg.whatsapp.net",
+    "messenger.com", "scontent.xx.fbcdn.net", "static.xx.fbcdn.net",
 ]
 MUST_BLOCK = [
     "doubleclick.net", "googlesyndication.com", "google-analytics.com",
     "app-measurement.com", "adnxs.com", "scorecardresearch.com",
-    "use-application-dns.net",
+    "use-application-dns.net", "connect.facebook.net",
 ]
 
 failures = []

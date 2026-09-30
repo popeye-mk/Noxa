@@ -41,10 +41,15 @@ get "https://easylist.to/easylist/easyprivacy.txt"                              
 get "https://easylist.to/easylist/easylist.txt"                                             "easylist/easylist.txt"
 get "https://big.oisd.nl/"                                                                  "oisd/oisd_big.txt"
 get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt"          "hagezi/pro.txt"
-get "https://raw.githubusercontent.com/AdguardTeam/AdGuardSDNSFilter/master/Filters/filter.txt" "adguard/dns.txt"
+# AdGuard DNS filter: the old AdGuardSDNSFilter/master/Filters path now 404s;
+# the compiled list is published from AdGuard's HostlistsRegistry.
+get "https://raw.githubusercontent.com/AdguardTeam/HostlistsRegistry/main/filters/general/filter_1_DnsFilter/filter.txt" "adguard/dns.txt"
 get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/doh.txt"          "hagezi/doh.txt"
 get "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Alternate%20versions%20Anti-Malware%20List/AntiMalwareAdGuardHome.txt" "dandelion/antimalware.txt"
-get "https://raw.githubusercontent.com/jmdugan/blocklists/master/corporations/facebook/all" "social/facebook.txt"
+# NOT fetched: jmdugan corporations/facebook/all. Despite being listed as a
+# "Meta pixel/SDK" source, it blocks ALL of Facebook, Instagram, WhatsApp and
+# Messenger (facebook.com, whatsapp.net, fbcdn.net...). Meta's tracking
+# endpoints are already covered by the other lists (connect.facebook.net etc.).
 get "https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/hosts.txt"      "nocoin/hosts.txt"
 get "https://phishing.army/download/phishing_army_blocklist_extended.txt"                   "phishing/phishing_army.txt"
 
