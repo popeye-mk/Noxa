@@ -16,6 +16,7 @@ so the weekly rebuild ships NOTHING — unless every check passes:
 Run:  python3 build-tools/verify_build.py
 """
 import hashlib, json, os, random, string, struct, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
@@ -24,6 +25,7 @@ MAX_DROP = 0.15      # refuse if the new list has >15% fewer domains
 MAX_GROWTH = 1.60    # refuse if it's >60% bigger
 
 MUST_ALLOW = [
+    "akamaihd.net", "steamcommunity-a.akamaihd.net",   # Akamai's shared CDN
     "google.com", "www.google.com", "wikipedia.org", "github.com", "mozilla.org",
     "signal.org", "apple.com", "microsoft.com", "gov.uk", "bbc.co.uk",
     "connectivitycheck.gstatic.com", "connectivitycheck.android.com",
@@ -95,6 +97,16 @@ check("false-positive rate < 1e-5", fp / trials < 1e-5, f"{fp}/{trials}")
 
 bad_allow = [d for d in MUST_ALLOW if blocked(d)]
 check("must-never-block domains pass", not bad_allow, ", ".join(bad_allow))
+if bad_allow:
+    # Say WHICH source list is responsible, so the fix is obvious.
+    try:
+        import which_source
+        srcs = which_source.load_sources()
+        for d in bad_allow:
+            print(f"    why {d} is blocked:")
+            print("\n".join("    " + l for l in which_source.explain(d, srcs)))
+    except Exception as e:
+        print(f"    (couldn't trace sources: {e})")
 not_blocked = [d for d in MUST_BLOCK if not blocked(d)]
 check("known trackers blocked", not not_blocked, ", ".join(not_blocked))
 
