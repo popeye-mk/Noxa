@@ -25,6 +25,7 @@ object FilterUpdater {
     private const val BASE = "https://raw.githubusercontent.com/popeye-mk/Noxa/main/app/src/main/assets"
     private const val MANIFEST_URL = "$BASE/blocklist-manifest.json"
     private const val FILTER_URL = "$BASE/guardian-default.gbf"
+    private const val STALKERWARE_URL = "$BASE/${Stalkerware.FILE}"
 
     private const val PREFS = "guardian_filter"
     private const val KEY_BUILT_AT = "filter_built_at"
@@ -72,10 +73,23 @@ object FilterUpdater {
             if (expected.isNotEmpty() && !sha256Hex(gbf).equals(expected, ignoreCase = true))
                 return "Downloaded list failed its integrity check — kept the current list."
 
+            // The stalkerware list rides along (small). Optional: an old manifest
+            // without its hash, or a failed download, keeps the current list.
+            val spyExpected = json.optString("stalkerware_sha256", "")
+            val spy = if (spyExpected.isEmpty()) null else httpGet(STALKERWARE_URL)
+            val spyOk = spy != null && sha256Hex(spy).equals(spyExpected, ignoreCase = true) &&
+                Stalkerware.parse(String(spy, Charsets.UTF_8)).size > 100
+
             val tmp = File(ctx.filesDir, "$FILTER_FILE.tmp")
             tmp.writeBytes(gbf)
             val dst = File(ctx.filesDir, FILTER_FILE)
             if (!tmp.renameTo(dst)) { tmp.copyTo(dst, overwrite = true); tmp.delete() }
+            if (spyOk) {
+                val stmp = File(ctx.filesDir, "${Stalkerware.FILE}.tmp")
+                stmp.writeBytes(spy!!)
+                val sdst = File(ctx.filesDir, Stalkerware.FILE)
+                if (!stmp.renameTo(sdst)) { stmp.copyTo(sdst, overwrite = true); stmp.delete() }
+            }
 
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString(KEY_BUILT_AT, remote).apply()

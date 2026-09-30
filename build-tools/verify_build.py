@@ -120,6 +120,14 @@ if bad_allow:
 not_blocked = [d for d in MUST_BLOCK if not blocked(d)]
 check("known trackers blocked", not not_blocked, ", ".join(not_blocked))
 
+stalk_path = os.path.join(OUT, "stalkerware.txt")
+stalk = [l.strip() for l in open(stalk_path)] if os.path.isfile(stalk_path) else []
+stalk = [d for d in stalk if d]
+check("stalkerware list present and sane (300..5000)", 300 <= len(stalk) <= 5000, f"{len(stalk)} domains")
+check("stalkerware hash matches manifest",
+      hashlib.sha256(("\n".join(sorted(set(stalk))) + "\n").encode()).hexdigest() == manifest.get("stalkerware_sha256"))
+check("stalkerware domains are all blocked by the filter", all(blocked(d) for d in stalk[:2000]))
+
 if os.path.isfile(SHIPPED):
     old = json.load(open(SHIPPED)).get("unique_domains", 0)
     if old:
