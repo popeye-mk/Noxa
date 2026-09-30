@@ -342,6 +342,7 @@ class GuardianVpnService : VpnService() {
                 if (now - lastFlush >= 30_000L) {
                     saveStats(); AppStats.save(this); DailyStats.save(this)
                     NoxaWidget.refreshAll(this)          // home-screen count stays fresh
+                    refreshNotification()                // "…N blocked today" in the shade
                     lastFlush = now
                 }
             }
@@ -620,6 +621,13 @@ class GuardianVpnService : VpnService() {
     override fun onDestroy() { stopVpn(); super.onDestroy() }
 
     // --- notification (foreground service requirement) -----------------------
+    /** v1.7: the persistent notification carries today's count. Same ID +
+     *  onlyAlertOnce = a silent in-place update, no buzz, no new entry. */
+    private fun refreshNotification() {
+        try { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification()) }
+        catch (_: Exception) {}
+    }
+
     private fun ensureChannel(mgr: NotificationManager) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             mgr.createNotificationChannel(
@@ -641,13 +649,16 @@ class GuardianVpnService : VpnService() {
             this, 4, Intent(this, GuardianVpnService::class.java).setAction(ACTION_PAUSE),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val today = DailyStats.today()
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Noxa is protecting you")
-            .setContentText("Blocking trackers and ads")
+            .setContentText(if (today == 0L) "Blocking trackers and ads"
+                            else "%,d tracking attempts blocked today".format(today))
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, "Pause 5 min", pause).build())
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .build()
     }
 }

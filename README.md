@@ -59,7 +59,7 @@ Noxa is a **local filter built on Android's `VpnService`** — not a real VPN by
 
 **Command line (Linux):** `bash build-on-linux.sh` fetches a JDK 17 + the Android SDK + Gradle into a local folder in your home directory and produces `app/build/outputs/apk/debug/app-debug.apk`.
 
-The compiled blocklist ships in `app/src/main/assets/guardian-default.gbf`, so the app builds without the raw lists. To **rebuild the filter**, download the sources (see `docs/`) and run `python3 build-tools/build_blocklist.py`. The build is cross-checked by `build-tools/test_filter.py`, `verify_kotlin_math.py`, and `test_packets.py`.
+The compiled blocklist ships in `app/src/main/assets/guardian-default.gbf`, so the app builds without the raw lists. To **rebuild the filter**, download the sources (see `docs/`) and run `python3 build-tools/build_blocklist.py`. The build is cross-checked by `build-tools/test_filter.py`, `verify_kotlin_math.py`, `test_packets.py` and `test_site_coverage.py` (ad-block test score); the app's own unit tests (`app/src/test`) run with `./gradlew testDebugUnitTest` and on every push in GitHub Actions.
 
 ---
 

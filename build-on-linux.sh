@@ -60,7 +60,7 @@ SDKMGR="$SDK/cmdline-tools/latest/bin/sdkmanager"
 
 echo "==> [3/6] SDK packages (platform 34, build-tools, platform-tools) + licenses"
 yes | "$SDKMGR" --sdk_root="$SDK" --licenses >/dev/null 2>&1 || true
-"$SDKMGR" --sdk_root="$SDK" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+"$SDKMGR" --sdk_root="$SDK" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
 echo "==> [4/6] point the project at the SDK"
 echo "sdk.dir=$SDK" > "$ROOT/local.properties"
