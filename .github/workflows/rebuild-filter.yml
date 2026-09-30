@@ -40,6 +40,13 @@ jobs:
       - name: Verify (refuses to ship on any failure)
         run: python3 build-tools/verify_build.py
 
+      - name: Ad-block test score must not drop (adblock.turtlecute.org hosts)
+        shell: bash   # = bash -eo pipefail, so the tee can't hide a failure
+        run: >
+          python3 build-tools/test_site_coverage.py --compare
+          app/src/main/assets/guardian-default.gbf build-tools/out/guardian-default.gbf
+          | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Cross-check Kotlin hashing math
         working-directory: build-tools
         run: python3 verify_kotlin_math.py

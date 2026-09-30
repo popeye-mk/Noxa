@@ -49,7 +49,7 @@ MUST_ALLOW = [
 MUST_BLOCK = [
     "doubleclick.net", "googlesyndication.com", "google-analytics.com",
     "app-measurement.com", "adnxs.com", "scorecardresearch.com",
-    "use-application-dns.net", "connect.facebook.net",
+    "use-application-dns.net", "connect.facebook.net", "udc.yahoo.com",
 ]
 
 failures = []

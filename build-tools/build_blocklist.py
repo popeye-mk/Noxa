@@ -139,6 +139,8 @@ ALWAYS_BLOCK_DOMAINS = [
     "connect.facebook.net",   # Meta Pixel / JS SDK loader on third-party sites
     "pixel.facebook.com",     # Meta Pixel beacon
     "an.facebook.com",        # Meta Audience Network (ads in other apps)
+    "udc.yahoo.com",          # Yahoo "user data collection" telemetry — the one
+                              # host the adblock.turtlecute.org test still caught
 ]
 
 # --- Bloom filter parameters -------------------------------------------------
