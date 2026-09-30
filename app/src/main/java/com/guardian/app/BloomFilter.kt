@@ -89,10 +89,22 @@ class BloomFilter private constructor(
                 val k = leInt(bytes, 4)
                 val m = leLong(bytes, 8)
                 val items = leLong(bytes, 16)
+                // A truncated/corrupt file would index past the bit array on
+                // lookups — reject it here so loadCurrent() falls back cleanly.
+                require(isValidHeader(k, m, bytes.size.toLong())) { "gbf size/header mismatch" }
                 val body = bytes.copyOfRange(24, bytes.size)
                 return BloomFilter(k, m, items, body)
             }
         }
+
+        /** Header sanity: sensible k, and the body is exactly ceil(m/8) bytes. */
+        fun isValidHeader(k: Int, mBits: Long, fileSize: Long): Boolean =
+            k in 1..64 && mBits > 0 && fileSize - 24 == (mBits + 7) / 8
+
+        /** Same check on raw file bytes (used before accepting a download). */
+        fun isValidFile(bytes: ByteArray): Boolean =
+            bytes.size >= 24 && String(bytes, 0, 4, Charsets.US_ASCII) == MAGIC &&
+                isValidHeader(leInt(bytes, 4), leLong(bytes, 8), bytes.size.toLong())
 
         private fun sha256(s: String): ByteArray =
             MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8))

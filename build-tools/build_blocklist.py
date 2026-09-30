@@ -374,6 +374,8 @@ def main():
     t0 = time.time()
     ba = build_bloom(domains, m_bits, k)
     write_gbf(os.path.join(OUT, "guardian-default.gbf"), m_bits, k, n, ba)
+    with open(os.path.join(OUT, "guardian-default.gbf"), "rb") as f:
+        gbf_sha256 = hashlib.sha256(f.read()).hexdigest()
     build_s = time.time() - t0
 
     with open(os.path.join(OUT, "merged-domains.txt"), "w") as f:
@@ -383,6 +385,7 @@ def main():
         "format": "GBF1",
         "built_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "false_positive_target": FALSE_POSITIVE_RATE,
+        "sha256": gbf_sha256,   # app verifies downloads against this
         "bloom": {"m_bits": m_bits, "k_hashes": k,
                   "size_mb": round(size_mb, 3), "items": n},
         "unique_domains": n,

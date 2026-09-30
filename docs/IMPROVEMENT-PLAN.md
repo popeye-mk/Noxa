@@ -19,6 +19,8 @@ change to the one-switch experience or the zero-telemetry guarantee.
 | 2 | Weekly auto-rebuild (GitHub Action) | TODO — next up |
 | 3 | Multi-hop CNAME uncloaking | **DONE — verified already covered** |
 | 4 | Wildcard/pattern rule layer | LATER — hot-path change, do carefully |
+| 5 | Resolver speed (workers, cache, ID check, DoH back-off) | **DONE — v1.4** |
+| 6 | Filter download integrity (SHA-256 + size check) | **DONE — v1.4** |
 
 ---
 
@@ -87,6 +89,27 @@ A domain Bloom filter can't catch randomized rotating subdomains
 - Format: a tiny static pattern table shipped in the app (not
   user-configurable, not a general regex engine).
 - Only add patterns backed by an observed miss on a real device or test.
+
+## 5. Resolver speed — DONE (v1.4)
+
+- Allowed lookups are resolved by 4 worker threads (each with its own
+  upstream socket); the tun loop only parses, filters and sinkholes. One
+  slow upstream answer no longer blocks every app's DNS.
+- `DnsCache`: LRU of raw upstream answers (1000 entries, min-TTL, capped
+  5 min, negative answers 60 s, never SERVFAIL/truncated). Blocking
+  decisions — filter, firewall, allowlist, CNAME-uncloaking — still run on
+  every lookup, so the cache can't bypass a block.
+- Plain-DNS fallback only accepts a reply whose transaction ID matches
+  (a late reply to a timed-out query used to reach the next query).
+- DoH back-off grows 5 s → 10 s → 20 s → 30 s instead of a flat 30 s.
+- Cross-checked in `build-tools/test_packets.py` ("DNS cache" section).
+
+## 6. Filter download integrity — DONE (v1.4)
+
+The manifest now carries the `.gbf` SHA-256 (written by
+`build_blocklist.py`); `FilterUpdater` refuses a download that doesn't
+match, and `BloomFilter.load` rejects any file whose body isn't exactly
+`ceil(m_bits/8)` bytes.
 
 ## v2.0 ambition: Noxa's own filter INSIDE the tunnel
 
