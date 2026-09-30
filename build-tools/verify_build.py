@@ -93,13 +93,17 @@ sample = domains if len(domains) <= 50000 else random.Random(1).sample(domains, 
 missing = [d for d in sample if not contains(d)]
 check("no false negatives (sample of %d)" % len(sample), not missing, ", ".join(missing[:5]))
 
+# False-positive sanity. The filter targets 1e-6, i.e. ~1 hit per million
+# random names, so this catches a BROKEN build (wrong m/k, bit array mostly
+# set: hundreds of hits) without tripping on chance: the old 200k-trial
+# "< 2 hits" rule refused a good build on 2 hits (expected 0.2, ~2% odds).
 dset = set(domains)
-rng = random.Random(7); fp = 0; trials = 200000
+rng = random.Random(7); fp = 0; trials = 1_000_000
 for _ in range(trials):
     d = "".join(rng.choices(string.ascii_lowercase, k=14)) + ".com"
     if d not in dset and contains(d):
         fp += 1
-check("false-positive rate < 1e-5", fp / trials < 1e-5, f"{fp}/{trials}")
+check("false-positive rate <= 2e-5 (1M random names)", fp <= 20, f"{fp}/{trials}")
 
 bad_allow = [d for d in MUST_ALLOW if blocked(d)]
 check("must-never-block domains pass", not bad_allow, ", ".join(bad_allow))
