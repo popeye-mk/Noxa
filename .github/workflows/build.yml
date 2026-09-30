@@ -1,11 +1,16 @@
 name: Build APK
 
-# Builds the debug APK on every push / PR and runs the packet-algorithm
+# Builds the test APK on every push / PR and runs the packet-algorithm
 # cross-checks. Download the APK from the run's "Artifacts" section.
+#
+# Phone-friendly: when YOU publish a release on GitHub, this builds the
+# release's code and attaches the APK to it (a normal download link).
 on:
   push:
   pull_request:
   workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -13,6 +18,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04   # pinned: ubuntu-latest moves to Ubuntu 26 on 2026-10-19
+    permissions:
+      contents: write   # only used to attach the APK to a release you published
     steps:
       - uses: actions/checkout@v7
 
@@ -38,3 +45,12 @@ jobs:
           name: noxa-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Attach APK to the release
+        if: github.event_name == 'release'
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk "noxa-${TAG}.apk"
+          gh release upload "$TAG" "noxa-${TAG}.apk" --clobber
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
