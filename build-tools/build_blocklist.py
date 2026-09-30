@@ -161,6 +161,10 @@ def normalize(line: str):
     s = s.split("/")[0].split(":")[0].strip()
     if "." not in s or " " in s:
         return None
+    # An IP address is not a domain: the app only ever checks looked-up NAMES,
+    # so an IP entry (e.g. EasyPrivacy's 127.0.0.1) only wastes filter space.
+    if s.replace(".", "").isdigit():
+        return None
     return s
 
 
@@ -244,6 +248,16 @@ def read_adblock(path):
             # drop the option suffix first (e.g. '||host^$third-party')
             d_i = body.find("$")
             if d_i != -1:
+                # A rule limited to SPECIFIC sites ('$domain=a.com|b.com') means
+                # "block this only while visiting a.com or b.com". DNS can't know
+                # which site you're on, so applying it would block the host
+                # EVERYWHERE — that's how akamaihd.net, cloudfront.net, t.co,
+                # imgur.com, bit.ly and Firebase ended up fully blocked (from
+                # e.g. '||akamaihd.net^$image,domain=globalnews.ca|nycgo.com').
+                # Skip those. Exclusion-only lists ('domain=~a.com' = "everywhere
+                # except a.com") still mean "block", so they're kept.
+                if _site_restricted(body[d_i + 1:]):
+                    continue
                 body = body[:d_i]
             # A '/' before the host terminator means this is a PATH-specific rule
             # (e.g. '||google.com/pagead/ads.js' = block one script, not the site).
@@ -266,6 +280,15 @@ def read_adblock(path):
             if d:
                 out.append(d)
     return out
+
+
+def _site_restricted(options: str) -> bool:
+    """True if Adblock options restrict the rule to particular sites."""
+    for opt in options.split(","):
+        opt = opt.strip()
+        if opt.startswith("domain="):
+            return any(d and not d.startswith("~") for d in opt[len("domain="):].split("|"))
+    return False
 
 
 def read_domains(path):
