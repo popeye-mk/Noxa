@@ -131,6 +131,16 @@ ALLOWLIST_DOMAINS = [
     "brave-core-ext.s3.brave.com",
 ]
 
+# Curated tracking-only endpoints that are ALWAYS blocked, whatever the
+# upstream lists contain this week. Keep this tiny and tracking-only: never an
+# app's core domain (verify_build.py's MUST_ALLOW enforces that). Added AFTER
+# the allowlist, so an entry here is deliberate and wins.
+ALWAYS_BLOCK_DOMAINS = [
+    "connect.facebook.net",   # Meta Pixel / JS SDK loader on third-party sites
+    "pixel.facebook.com",     # Meta Pixel beacon
+    "an.facebook.com",        # Meta Audience Network (ads in other apps)
+]
+
 # --- Bloom filter parameters -------------------------------------------------
 # p = target false-positive rate. Lower = fewer legit domains wrongly blocked,
 # at the cost of a slightly bigger file and more hashes per lookup.
@@ -363,6 +373,11 @@ def main():
     all_domains -= allow
     print("  allowlist: %d domains ; removed %d from blocklist"
           % (len(allow), before - len(all_domains)))
+    added = [d for d in ALWAYS_BLOCK_DOMAINS if d not in all_domains]
+    all_domains.update(ALWAYS_BLOCK_DOMAINS)
+    per_cat["curated_always_block"] = len(ALWAYS_BLOCK_DOMAINS)
+    print("  curated always-block: %d domains (%d not already listed)"
+          % (len(ALWAYS_BLOCK_DOMAINS), len(added)))
 
     n = len(all_domains)
     raw_total = sum(per_cat.values())
@@ -396,6 +411,7 @@ def main():
         "raw_total": raw_total,
         "protection_categories": {c: per_cat[c] for c in PROTECTION_CATEGORIES},
         "extra_sources": {name: per_cat.get(name, 0) for name in EXTRA_SOURCES},
+        "curated_always_block": len(ALWAYS_BLOCK_DOMAINS),
         "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); "
                    "idx_i=(h1 + i*h2) mod m, i in 0..k-1",
     }
