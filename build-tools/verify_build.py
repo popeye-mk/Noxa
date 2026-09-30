@@ -25,7 +25,13 @@ MAX_DROP = 0.15      # refuse if the new list has >15% fewer domains
 MAX_GROWTH = 1.60    # refuse if it's >60% bigger
 
 MUST_ALLOW = [
-    "akamaihd.net", "steamcommunity-a.akamaihd.net",   # Akamai's shared CDN
+    # Shared infrastructure: blocking the whole domain breaks thousands of
+    # unrelated sites/apps. (Each was once blocked via a site-restricted
+    # browser rule — see _site_restricted in build_blocklist.py.)
+    "akamaihd.net", "cloudfront.net", "global.ssl.fastly.net", "b-cdn.net",
+    "cdn77.org", "workers.dev", "files.wordpress.com",
+    "firebase.googleapis.com", "firebaseinstallations.googleapis.com",
+    "imgur.com", "i.imgur.com", "t.co", "bit.ly",
     "google.com", "www.google.com", "wikipedia.org", "github.com", "mozilla.org",
     "signal.org", "apple.com", "microsoft.com", "gov.uk", "bbc.co.uk",
     "connectivitycheck.gstatic.com", "connectivitycheck.android.com",
