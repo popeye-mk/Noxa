@@ -71,6 +71,23 @@
             android:name=".AllowlistActivity"
             android:exported="false" />
 
+        <!-- v1.5 live feed: watch lookups happen, fix a block in one tap. -->
+        <activity
+            android:name=".LiveActivity"
+            android:exported="false" />
+
+        <!-- v1.5 Quick Settings tile: on/off from the pull-down shade. -->
+        <service
+            android:name=".NoxaTileService"
+            android:icon="@drawable/ic_tile_shield"
+            android:label="Noxa"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- v1.2 keep-alive watchdog: every ~15 min + after boot, restarts
              protection if an aggressive battery manager killed it and the user
              still wants it on. Runs entirely on-device. -->

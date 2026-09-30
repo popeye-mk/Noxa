@@ -58,4 +58,15 @@
         android:background="@drawable/btn_primary"
         android:textColor="#FFFFFF" />
 
+    <Button
+        android:id="@+id/live"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:paddingStart="28dp"
+        android:paddingEnd="28dp"
+        android:text="@string/watch_live"
+        android:background="@drawable/btn_secondary"
+        android:textColor="#FFFFFF" />
+
 </LinearLayout>

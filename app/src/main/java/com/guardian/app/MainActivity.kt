@@ -55,6 +55,9 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.details).setOnClickListener {
             startActivity(Intent(this, AppsActivity::class.java))
         }
+        findViewById<Button>(R.id.live).setOnClickListener {
+            startActivity(Intent(this, LiveActivity::class.java))
+        }
         tick()
         ensureNotificationPermission()
         maybeShowIntro()
@@ -114,6 +117,12 @@ class MainActivity : Activity() {
             blockerOn -> {
                 status.text = getString(R.string.on)
                 status.setTextColor(android.graphics.Color.parseColor("#4CC38A"))
+            }
+            GuardianVpnService.isPaused(this) -> {
+                val at = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                    .format(java.util.Date(GuardianVpnService.pausedUntil(this)))
+                status.text = "⏸  Paused — back on by itself at about $at (or flip the switch)"
+                status.setTextColor(android.graphics.Color.parseColor("#E5A84D"))
             }
             else -> {
                 status.text = getString(R.string.off)

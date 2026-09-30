@@ -34,7 +34,9 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Stays on** — battery-exemption ask, a self-restarting watchdog, and automatic start after reboot: protection that doesn't silently die.
 - **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi.
 - **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
-- **User allowlist** — un-block anything caught by mistake, yourself.
+- **Watch it live** — see every app's lookups as they happen; tap one to allow or block that site on the spot. Kept in memory only, never saved.
+- **Your own lists** — *Allowed sites* (never block) and *My blocked sites* (always block), editable any time.
+- **Quick Settings tile + "Pause 5 min"** — on/off from the pull-down shade; a one-tap timed pause in the notification that turns itself back on.
 - **30-day rolling stats**, CSV export, first-run explainer.
 - **Zero telemetry, verifiable.** No location permission, no accounts, nothing phones home.
 

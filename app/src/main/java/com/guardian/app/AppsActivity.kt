@@ -203,8 +203,10 @@ class AppsActivity : Activity() {
     /** All the advanced controls, in one calm plain-language menu. */
     private fun showToolsMenu() {
         val items = arrayOf(
+            "📡  Live — watch it happen",
             "🌐  Hide my IP (private tunnel)",
             "✓  Allowed sites (never block these)",
+            "⛔  My blocked sites (always block these)",
             "🔧  Fix an app that won't work",
             "🔄  Update protection now",
             "🔋  Keep protection always on",
@@ -214,12 +216,15 @@ class AppsActivity : Activity() {
             .setTitle("Settings & tools")
             .setItems(items) { _, i ->
                 when (i) {
-                    0 -> startActivity(Intent(this, TunnelActivity::class.java))
-                    1 -> startActivity(Intent(this, AllowlistActivity::class.java))
-                    2 -> showExcludePicker()
-                    3 -> checkForUpdate()
-                    4 -> openAlwaysOn()
-                    5 -> exportCsv()
+                    0 -> startActivity(Intent(this, LiveActivity::class.java))
+                    1 -> startActivity(Intent(this, TunnelActivity::class.java))
+                    2 -> startActivity(Intent(this, AllowlistActivity::class.java))
+                    3 -> startActivity(Intent(this, AllowlistActivity::class.java)
+                        .putExtra(AllowlistActivity.EXTRA_BLOCK, true))
+                    4 -> showExcludePicker()
+                    5 -> checkForUpdate()
+                    6 -> openAlwaysOn()
+                    7 -> exportCsv()
                 }
             }
             .setNegativeButton("Close", null)
