@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""
+Strict gate for a freshly built filter (build-tools/out/). Exits non-zero —
+so the weekly rebuild ships NOTHING — unless every check passes:
+
+  1. file format/size match the header, SHA-256 matches the manifest
+  2. every domain in merged-domains.txt is found (no false negatives)
+  3. false-positive rate on random names stays near the 1e-6 target
+  4. must-never-block domains (banks' infra, connectivity checks, resolvers'
+     info pages, VPN providers, common sites) are NOT blocked
+  5. known trackers ARE blocked
+  6. size sanity vs the filter currently shipped in the app: refuse a list
+     that shrank by more than MAX_DROP (a big source silently failed) or
+     grew absurdly (a source went haywire)
+
+Run:  python3 build-tools/verify_build.py
+"""
+import hashlib, json, os, random, string, struct, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(HERE, "out")
+SHIPPED = os.path.join(os.path.dirname(HERE), "app", "src", "main", "assets", "blocklist-manifest.json")
+MAX_DROP = 0.15      # refuse if the new list has >15% fewer domains
+MAX_GROWTH = 1.60    # refuse if it's >60% bigger
+
+MUST_ALLOW = [
+    "google.com", "www.google.com", "wikipedia.org", "github.com", "mozilla.org",
+    "signal.org", "apple.com", "microsoft.com", "gov.uk", "bbc.co.uk",
+    "connectivitycheck.gstatic.com", "connectivitycheck.android.com",
+    "clients3.google.com", "captive.apple.com", "quad9.net",
+    "mullvad.net", "protonvpn.com", "proton.me", "ivpn.net",
+    "raw.githubusercontent.com",   # the app's own filter-update source
+]
+MUST_BLOCK = [
+    "doubleclick.net", "googlesyndication.com", "google-analytics.com",
+    "app-measurement.com", "adnxs.com", "scorecardresearch.com",
+    "use-application-dns.net",
+]
+
+failures = []
+def check(name, ok, detail=""):
+    print(f"  [{'PASS' if ok else 'FAIL'}] {name}{('  — ' + detail) if detail else ''}")
+    if not ok:
+        failures.append(name)
+
+gbf_path = os.path.join(OUT, "guardian-default.gbf")
+raw = open(gbf_path, "rb").read()
+manifest = json.load(open(os.path.join(OUT, "manifest.json")))
+check("magic GBF1", raw[:4] == b"GBF1")
+k = struct.unpack("<I", raw[4:8])[0]
+m = struct.unpack("<Q", raw[8:16])[0]
+n = struct.unpack("<Q", raw[16:24])[0]
+ba = raw[24:]
+check("body size == ceil(m/8)", len(ba) == (m + 7) // 8, f"{len(ba)} vs {(m + 7) // 8}")
+check("sha256 matches manifest", hashlib.sha256(raw).hexdigest() == manifest.get("sha256"))
+check("k sane (1..64)", 1 <= k <= 64, f"k={k}")
+
+def contains(d):
+    h = hashlib.sha256(d.encode()).digest()
+    h1 = int.from_bytes(h[0:8], "little"); h2 = int.from_bytes(h[8:16], "little")
+    for i in range(k):
+        idx = (h1 + i * h2) % m
+        if not (ba[idx >> 3] >> (idx & 7)) & 1:
+            return False
+    return True
+
+def blocked(host):   # same parent walk as the app (BloomFilter.matchesHostOrParent)
+    h = host.lower().rstrip(".")
+    while "." in h:
+        if contains(h):
+            return True
+        h = h.split(".", 1)[1]
+    return False
+
+domains = [l.strip() for l in open(os.path.join(OUT, "merged-domains.txt")) if l.strip()]
+check("item count matches header", len(domains) == n, f"{len(domains)} vs {n}")
+sample = domains if len(domains) <= 50000 else random.Random(1).sample(domains, 50000)
+missing = [d for d in sample if not contains(d)]
+check("no false negatives (sample of %d)" % len(sample), not missing, ", ".join(missing[:5]))
+
+dset = set(domains)
+rng = random.Random(7); fp = 0; trials = 200000
+for _ in range(trials):
+    d = "".join(rng.choices(string.ascii_lowercase, k=14)) + ".com"
+    if d not in dset and contains(d):
+        fp += 1
+check("false-positive rate < 1e-5", fp / trials < 1e-5, f"{fp}/{trials}")
+
+bad_allow = [d for d in MUST_ALLOW if blocked(d)]
+check("must-never-block domains pass", not bad_allow, ", ".join(bad_allow))
+not_blocked = [d for d in MUST_BLOCK if not blocked(d)]
+check("known trackers blocked", not not_blocked, ", ".join(not_blocked))
+
+if os.path.isfile(SHIPPED):
+    old = json.load(open(SHIPPED)).get("unique_domains", 0)
+    if old:
+        ratio = n / old
+        check(f"size sane vs shipped ({old:,} -> {n:,})", 1 - MAX_DROP <= ratio <= MAX_GROWTH, f"ratio {ratio:.3f}")
+
+if failures:
+    print(f"\nREFUSED: {len(failures)} check(s) failed — the new filter must not ship.")
+    sys.exit(1)
+print("\nAll build checks passed — safe to ship.")

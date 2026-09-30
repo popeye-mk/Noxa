@@ -33,3 +33,5 @@ for d in sample:
     tested+=1
     if contains_builder(d)!=contains_kotlin(d): mismatch+=1
 print(f"tested={tested}  mismatches={mismatch}  -> {'MATCH' if mismatch==0 else 'BUG'}")
+if mismatch:
+    raise SystemExit(1)   # CI gate: never ship a filter the app would read differently
