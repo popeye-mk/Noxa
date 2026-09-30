@@ -187,7 +187,11 @@ EXTRA_SOURCES = {
     "hagezi_doh":     ("blocklists/hagezi/doh.txt",           "adblock"),  # DoH/DoT bypass
     # Improvement plan phase 1 — targeted at MEASURED gaps (social SDK 88%):
     "dandelion_am":   ("blocklists/dandelion/antimalware.txt","adblock"),  # Anti-Malware
-    "facebook_sdk":   ("blocklists/social/facebook.txt",      "domains"),  # Meta pixel/SDK
+    # "facebook_sdk" (jmdugan corporations/facebook/all) REMOVED: it's a hosts
+    # file that blocks all of Facebook/Instagram/WhatsApp/Messenger — it only
+    # ever contributed a handful of domains because it was parsed as the wrong
+    # format. Meta trackers stay covered by the lists above. verify_build.py
+    # now refuses any filter that blocks Meta's core apps.
     "nocoin":         ("blocklists/nocoin/hosts.txt",         "hosts"),    # cryptomining
     "phishing_army":  ("blocklists/phishing/phishing_army.txt","domains"), # phishing
 }
