@@ -1,0 +1,82 @@
+name: Rebuild blocklist
+
+# Weekly: download every source list, rebuild the compiled filter, verify it
+# strictly, and — only on main — commit it. Phones already check this repo
+# daily (FilterUpdater) and swap a newer list in live, so users get fresh
+# protection every week with zero manual work and no server of our own.
+#
+# On any other branch (or a push touching the build tools) it's a DRY RUN:
+# same build + checks, the result is uploaded as an artifact, nothing committed.
+on:
+  schedule:
+    - cron: "17 4 * * 1"        # Mondays 04:17 UTC
+  workflow_dispatch:
+  push:
+    paths:
+      - "build-tools/**"
+      - ".github/workflows/rebuild-filter.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rebuild-filter-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # only used on main, to commit the verified filter
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download source lists
+        run: bash build-tools/fetch_sources.sh
+
+      - name: Build filter
+        run: python3 build-tools/build_blocklist.py
+
+      - name: Verify (refuses to ship on any failure)
+        run: python3 build-tools/verify_build.py
+
+      - name: Ad-block test score must not drop (adblock.turtlecute.org hosts)
+        shell: bash   # = bash -eo pipefail, so the tee can't hide a failure
+        run: >
+          python3 build-tools/test_site_coverage.py --compare
+          app/src/main/assets/guardian-default.gbf build-tools/out/guardian-default.gbf
+          | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Cross-check Kotlin hashing math
+        working-directory: build-tools
+        run: python3 verify_kotlin_math.py
+
+      - name: Stage into the app
+        id: stage
+        run: |
+          cp build-tools/out/guardian-default.gbf app/src/main/assets/guardian-default.gbf
+          cp build-tools/out/manifest.json app/src/main/assets/blocklist-manifest.json
+          if git diff --quiet -- app/src/main/assets/guardian-default.gbf; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "Filter unchanged."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "### New filter" >> "$GITHUB_STEP_SUMMARY"
+          python3 -c "import json;m=json.load(open('build-tools/out/manifest.json'));print(f\"{m['unique_domains']:,} domains, built {m['built_at']} UTC\")" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rebuilt-filter
+          path: |
+            build-tools/out/guardian-default.gbf
+            build-tools/out/manifest.json
+            build-tools/out/build-report.txt
+
+      - name: Commit (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'push' && steps.stage.outputs.changed == 'true'
+        run: |
+          git config user.name "noxa-filter-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/assets/guardian-default.gbf app/src/main/assets/blocklist-manifest.json
+          git commit -m "Weekly blocklist rebuild ($(date -u +%Y-%m-%d))"
+          git push

@@ -1,0 +1,9 @@
+Fresh protection every week, and Noxa on your home screen:
+• Blocklist now rebuilds itself every week from all sources, with strict
+  safety checks — your phone picks it up automatically
+• NEW home-screen widget: protection status, trackers blocked today,
+  and an on/off button
+• NEW 7-day chart of blocked trackers on the main screen
+• NEW back up & restore your allowed/blocked sites and app settings
+• Fixed: opening some screens could lose the last few seconds of stats
+• Main screen scrolls on small screens and TVs, and uses less battery

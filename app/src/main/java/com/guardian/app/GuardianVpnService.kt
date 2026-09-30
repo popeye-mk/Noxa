@@ -19,8 +19,11 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
-import java.nio.ByteBuffer
+import java.net.SocketTimeoutException
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -48,7 +51,17 @@ class GuardianVpnService : VpnService() {
     private var worker: Thread? = null
     private val running = AtomicBoolean(false)
 
-    private lateinit var filter: BloomFilter
+    // Volatile: a downloaded update is swapped in live (v1.5), no restart needed.
+    @Volatile private lateinit var filter: BloomFilter
+
+    // Allowed lookups are resolved upstream by a few worker threads, so one
+    // slow answer (bad Wi-Fi, DoH timeout) can't stall every other app's DNS.
+    // The tun read loop only does the fast work: parse, filter, sinkhole.
+    private class Job(val packet: ByteArray, val len: Int, val q: DnsPacket.Query,
+                      val pkg: String, val skipCname: Boolean)
+    private val jobs = ArrayBlockingQueue<Job>(256)   // full -> drop; the app retries
+    private val workers = ArrayList<Thread>()
+    private val cache = DnsCache()
 
     // Phase 2: attribute each DNS query to the app that made it.
     private var connectivity: ConnectivityManager? = null
@@ -57,6 +70,9 @@ class GuardianVpnService : VpnService() {
     companion object {
         const val ACTION_START = "com.guardian.app.START"
         const val ACTION_STOP = "com.guardian.app.STOP"
+        const val ACTION_PAUSE = "com.guardian.app.PAUSE"
+        const val PAUSE_MS = 5L * 60 * 1000
+        private const val PAUSED_NOTIF_ID = 2
         private const val CHANNEL_ID = "guardian_protection"
         private const val NOTIF_ID = 1
         private const val TAG = "Guardian"
@@ -79,6 +95,8 @@ class GuardianVpnService : VpnService() {
         // Upstream resolver used for ALLOWED lookups (Cloudflare here; a
         // mainstream resolver keeps us in a large anonymity set — see mission).
         private val UPSTREAM_DNS = InetAddress.getByName("1.1.1.1")
+        private const val WORKERS = 4
+        private const val UPSTREAM_TIMEOUT_MS = 3000
 
         // Live counter the UI reads to show "X tracking attempts blocked".
         val blockedCount = AtomicLong(0)
@@ -104,6 +122,22 @@ class GuardianVpnService : VpnService() {
         // the watchdog can tell "killed by the OS" (restart!) apart from
         // "turned off by the user" (leave it off).
         private const val KEY_WANT = "protection_wanted"
+        private const val KEY_PAUSED_UNTIL = "paused_until"
+
+        /** v1.5 "Pause 5 min": protection is off until this time, then the
+         *  watchdog brings it back. 0 = not paused. */
+        fun pausedUntil(ctx: Context): Long =
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_PAUSED_UNTIL, 0L)
+        fun isPaused(ctx: Context): Boolean = pausedUntil(ctx) > System.currentTimeMillis()
+        private fun setPausedUntil(ctx: Context, t: Long) {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putLong(KEY_PAUSED_UNTIL, t).apply()
+        }
+
+        // Set by FilterUpdater after it installs a newer list; the running
+        // service picks it up on its next lookup and swaps the filter live.
+        private val filterReload = AtomicBoolean(false)
+        fun requestFilterReload() = filterReload.set(true)
         fun wantsProtection(ctx: Context): Boolean =
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WANT, false)
         fun setWantsProtection(ctx: Context, on: Boolean) {
@@ -113,12 +147,23 @@ class GuardianVpnService : VpnService() {
     }
 
     @Volatile private var dohRetryAt = 0L   // back-off clock when DoH is failing
+    private val dohFailures = AtomicInteger(0)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             setWantsProtection(this, false)      // the USER said stop —
             WatchdogReceiver.cancel(this)        // the watchdog must not resurrect it
+            setPausedUntil(this, 0L)             // a real "off" also ends any pause
+            getSystemService(NotificationManager::class.java).cancel(PAUSED_NOTIF_ID)
             stopVpn()
+            return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_PAUSE) {
+            // Keep wantsProtection = true: this is a timed break, not "off".
+            setPausedUntil(this, System.currentTimeMillis() + PAUSE_MS)
+            WatchdogReceiver.scheduleResume(this, PAUSE_MS)
+            stopVpn()
+            showPausedNotification()
             return START_NOT_STICKY
         }
         // Go foreground IMMEDIATELY: when the watchdog restarts us from the
@@ -139,6 +184,14 @@ class GuardianVpnService : VpnService() {
             return START_NOT_STICKY
         }
         setWantsProtection(this, true)
+        // An explicit start ends any pause ("Resume now", the switch, the tile).
+        // A sticky/watchdog restart while still paused stays off.
+        if (intent == null && isPaused(this)) {
+            stopForeground(true); stopSelf()
+            return START_NOT_STICKY
+        }
+        setPausedUntil(this, 0L)
+        getSystemService(NotificationManager::class.java).cancel(PAUSED_NOTIF_ID)
         WatchdogReceiver.schedule(this)
         startVpn()
         return START_STICKY
@@ -159,6 +212,7 @@ class GuardianVpnService : VpnService() {
         // Phase 2: per-app stats + firewall, and the service to map query -> app.
         connectivity = getSystemService(ConnectivityManager::class.java)
         AppStats.load(this)
+        DailyStats.load(this)
         maybeResetStatsPeriod()          // roll the counters every 30 days
 
         val builder = Builder()
@@ -204,6 +258,8 @@ class GuardianVpnService : VpnService() {
         tunnel = fd
         running.set(true)
         isRunning.set(true)
+        NoxaWidget.refreshAll(this)
+        NoxaTileService.refresh(this)
         startForeground(NOTIF_ID, buildNotification())
         Log.i(TAG, "Guardian tun up; filter items=${filter.items}")
 
@@ -215,14 +271,13 @@ class GuardianVpnService : VpnService() {
         val input = FileInputStream(tun.fileDescriptor)
         val output = FileOutputStream(tun.fileDescriptor)
         val buffer = ByteArray(32767)
-        var sinceFlush = 0
+        var lastFlush = System.currentTimeMillis()
 
-        // One protected upstream socket, reused for every allowed lookup — far
-        // cheaper than opening/closing a fresh socket on every DNS query.
-        val upstream = DatagramSocket()
-        protect(upstream)
-        upstream.soTimeout = 3000
-        try { upstream.connect(InetSocketAddress(UPSTREAM_DNS, 53)) } catch (_: Exception) {}
+        synchronized(workers) {
+            repeat(WORKERS) { i ->
+                workers += Thread({ workerLoop(output) }, "guardian-dns-$i").also { it.start() }
+            }
+        }
 
         try {
             while (running.get()) {
@@ -236,44 +291,65 @@ class GuardianVpnService : VpnService() {
                 val query = DnsPacket.parseQuery(buffer, length) ?: continue
                 val pkg = ownerOf(buffer, query)   // which app made this lookup
 
+                if (filterReload.compareAndSet(true, false)) reloadFilterAsync()
+
                 when {
                     AppStats.isFirewalled(pkg) -> {
                         // PER-APP FIREWALL: this app is blocked entirely — sinkhole
                         // every lookup it makes, on the same pipeline as everything else.
-                        blockedCount.incrementAndGet()
+                        onBlocked()
                         AppStats.recordBlocked(pkg, "Blocked by you · Firewall")
-                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { output.write(it) }
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.FIREWALL, "Whole app blocked by you")
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
+                    }
+                    AppStats.isUserBlocked(query.domain) -> {
+                        // USER BLOCK LIST (v1.5): "always block this" — the user's
+                        // explicit choice wins over everything below, allowlist included.
+                        onBlocked()
+                        AppStats.recordBlocked(pkg, "Blocked by you · Site")
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.MINE, "On your block list")
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     AppStats.isUserAllowed(query.domain) -> {
                         // USER ALLOWLIST: "never block this" — overrides the tracker
                         // filter (and skips CNAME-uncloaking) so it always resolves.
-                        forward(buffer, length, query, pkg, upstream, output, skipCname = true)
+                        resolve(buffer, length, query, pkg, output, skipCname = true)
                     }
                     query.domain == DOH_CANARY -> {
                         // Disable browser auto-DoH: answer the canary NXDOMAIN.
-                        blockedCount.incrementAndGet()
+                        onBlocked()
                         AppStats.recordBlocked(pkg, "DNS-over-HTTPS · Filter bypass")
-                        DnsPacket.buildNxDomainResponse(buffer, length, query)?.let { output.write(it) }
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, "DNS-over-HTTPS · Filter bypass")
+                        DnsPacket.buildNxDomainResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     filter.matchesHostOrParent(query.domain) -> {
                         // BLOCKED: sinkhole (0.0.0.0) + record WHO the tracker is (Phase 3).
-                        blockedCount.incrementAndGet()
-                        AppStats.recordBlocked(pkg, Trackers.label(query.domain))
-                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { output.write(it) }
+                        onBlocked()
+                        val label = Trackers.label(query.domain)
+                        AppStats.recordBlocked(pkg, label)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, label)
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
                         // ALLOWED (unless CNAME-uncloaking finds a tracker in the
-                        // answer). forward() does the allowed/blocked counting.
-                        forward(buffer, length, query, pkg, upstream, output)
+                        // answer). answer() does the allowed/blocked counting.
+                        resolve(buffer, length, query, pkg, output)
                     }
                 }
-                // Save the totals to disk every so often so a kill can't lose them.
-                if (++sinceFlush >= 50) { saveStats(); AppStats.save(this); sinceFlush = 0 }
+                // Save the totals to disk every 30 s so a kill can't lose much —
+                // time-based, so a busy phone doesn't rewrite storage constantly.
+                val now = System.currentTimeMillis()
+                if (now - lastFlush >= 30_000L) {
+                    saveStats(); AppStats.save(this); DailyStats.save(this)
+                    NoxaWidget.refreshAll(this)          // home-screen count stays fresh
+                    refreshNotification()                // "…N blocked today" in the shade
+                    lastFlush = now
+                }
             }
         } finally {
             saveStats()
             AppStats.save(this)
-            try { upstream.close() } catch (_: Exception) {}
+            stopWorkers()
         }
         // If we fell out of the loop while still "running", the tunnel died
         // (e.g. network change / EOF). Shut down cleanly instead of leaving a
@@ -281,47 +357,135 @@ class GuardianVpnService : VpnService() {
         if (running.get()) stopVpn()
     }
 
-    /** Relay an allowed DNS query upstream and write the answer back to the tun.
-     *  Prefers encrypted DNS (DoH); falls back to plain DNS so it never breaks.
-     *  Also CNAME-uncloaks: if the answer's CNAME chain points at a tracker, the
-     *  query is blocked instead (does the allowed/blocked counting itself). */
-    private fun forward(ipPacket: ByteArray, len: Int, q: DnsPacket.Query, pkg: String,
-                        sock: DatagramSocket, tunOut: FileOutputStream, skipCname: Boolean = false) {
-        try {
-            val payload = DnsPacket.extractUdpPayload(ipPacket, len) ?: return
+    /** Every block, from any path: the live counter + the per-day history. */
+    private fun onBlocked() {
+        blockedCount.incrementAndGet()
+        DailyStats.recordBlock()
+    }
 
-            // Get the upstream answer — encrypted DNS preferred (30s back-off on
-            // failure so a blocked :443 can't stall every query), else plain DNS.
+    /** Serialise tun writes: the read loop and the workers all answer apps. */
+    private fun writeTun(out: FileOutputStream, bytes: ByteArray) {
+        synchronized(out) { out.write(bytes) }
+    }
+
+    /** An allowed lookup: answer straight from the cache when we can (no
+     *  network at all), otherwise queue it for a worker to resolve upstream. */
+    private fun resolve(ipPacket: ByteArray, len: Int, q: DnsPacket.Query, pkg: String,
+                        tunOut: FileOutputStream, skipCname: Boolean = false) {
+        val payload = DnsPacket.extractUdpPayload(ipPacket, len) ?: return
+        val cached = cache.get(q, payload)
+        if (cached != null) {
+            answer(ipPacket, len, q, pkg, cached, tunOut, skipCname)
+            return
+        }
+        // The loop reuses its buffer, so the job gets its own copy.
+        if (!jobs.offer(Job(ipPacket.copyOf(len), len, q, pkg, skipCname)))
+            Log.w(TAG, "resolver queue full, dropping lookup (app will retry)")
+    }
+
+    /** One resolver worker: its own protected upstream socket, so replies can
+     *  never be read by the wrong thread. */
+    private fun workerLoop(tunOut: FileOutputStream) {
+        val sock = try {
+            DatagramSocket().also {
+                protect(it)
+                it.connect(InetSocketAddress(UPSTREAM_DNS, 53))
+            }
+        } catch (e: Exception) { Log.w(TAG, "worker socket failed: $e"); return }
+        try {
+            // Interrupted = this worker belongs to a stopped session; exit even
+            // if protection was already switched back on (new workers exist).
+            while (running.get() && !Thread.currentThread().isInterrupted) {
+                val job = try { jobs.poll(1, TimeUnit.SECONDS) } catch (_: InterruptedException) { break }
+                    ?: continue
+                forward(job, sock, tunOut)
+            }
+        } finally {
+            try { sock.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun stopWorkers() {
+        synchronized(workers) {
+            for (w in workers) try { w.interrupt() } catch (_: Exception) {}
+            workers.clear()
+        }
+        jobs.clear()
+    }
+
+    /** Relay an allowed DNS query upstream and write the answer back to the tun.
+     *  Prefers encrypted DNS (DoH); falls back to plain DNS so it never breaks. */
+    private fun forward(job: Job, sock: DatagramSocket, tunOut: FileOutputStream) {
+        try {
+            val payload = DnsPacket.extractUdpPayload(job.packet, job.len) ?: return
+
+            // Get the upstream answer — encrypted DNS preferred (growing back-off
+            // on failure so a blocked :443 can't stall every query), else plain DNS.
             var reply: ByteArray? = null
             if (encryptedDns.get() && System.currentTimeMillis() >= dohRetryAt) {
                 reply = resolveDoh(payload)
-                if (reply == null) dohRetryAt = System.currentTimeMillis() + 30_000L
+                if (reply == null) {
+                    // 5s, 10s, 20s, then every 30s while DoH stays unreachable.
+                    val n = dohFailures.incrementAndGet().coerceAtMost(4)
+                    dohRetryAt = System.currentTimeMillis() + minOf(30_000L, 5_000L shl (n - 1))
+                } else {
+                    dohFailures.set(0)
+                }
             }
-            if (reply == null) {
-                sock.send(java.net.DatagramPacket(payload, payload.size))
-                val buf = ByteArray(1500)
-                val resp = java.net.DatagramPacket(buf, buf.size)
-                sock.receive(resp)
-                reply = buf.copyOf(resp.length)
-            }
+            if (reply == null) reply = resolvePlain(payload, sock) ?: return
 
+            cache.put(job.q, reply)
+            answer(job.packet, job.len, job.q, job.pkg, reply, tunOut, job.skipCname)
+        } catch (e: Exception) {
+            Log.w(TAG, "fwd fail: $e")
+        }
+    }
+
+    /** Plain UDP DNS. Only accepts a reply whose transaction ID matches this
+     *  query: a late answer to an earlier, timed-out query can still arrive on
+     *  the socket and must never be handed to the wrong lookup. */
+    private fun resolvePlain(payload: ByteArray, sock: DatagramSocket): ByteArray? {
+        sock.send(java.net.DatagramPacket(payload, payload.size))
+        val deadline = System.currentTimeMillis() + UPSTREAM_TIMEOUT_MS
+        val buf = ByteArray(4096)
+        while (true) {
+            val left = deadline - System.currentTimeMillis()
+            if (left <= 0) return null
+            sock.soTimeout = left.toInt()
+            val resp = java.net.DatagramPacket(buf, buf.size)
+            try { sock.receive(resp) } catch (_: SocketTimeoutException) { return null }
+            if (resp.length >= 12 && buf[0] == payload[0] && buf[1] == payload[1])
+                return buf.copyOf(resp.length)
+            // stale reply for an earlier query — discard and keep waiting
+        }
+    }
+
+    /** Deliver an upstream (or cached) answer to the app. CNAME-uncloaks first:
+     *  if the answer's CNAME chain points at a tracker, the query is blocked
+     *  instead. Does the allowed/blocked counting itself. */
+    private fun answer(ipPacket: ByteArray, len: Int, q: DnsPacket.Query, pkg: String,
+                       reply: ByteArray, tunOut: FileOutputStream, skipCname: Boolean) {
+        try {
             // CNAME-uncloaking: a tracker hiding behind a first-party subdomain
             // shows up as a CNAME to a blocked domain — sinkhole it. (Skipped when
             // the user explicitly allowlisted the domain.)
             val cloaked = if (skipCname) null else DnsPacket.cnameTargets(reply, reply.size)
                 .firstOrNull { filter.matchesHostOrParent(it) }
             if (cloaked != null) {
-                blockedCount.incrementAndGet()
-                AppStats.recordBlocked(pkg, "${Trackers.companyOf(Trackers.label(cloaked))} · CNAME-cloaked")
-                DnsPacket.buildSinkholeResponse(ipPacket, len, q)?.let { tunOut.write(it) }
+                onBlocked()
+                val label = "${Trackers.companyOf(Trackers.label(cloaked))} · CNAME-cloaked"
+                AppStats.recordBlocked(pkg, label)
+                LiveLog.add(pkg, q.domain, LiveLog.Verdict.CLOAKED, "$label (hides $cloaked)")
+                DnsPacket.buildSinkholeResponse(ipPacket, len, q)?.let { writeTun(tunOut, it) }
                 return
             }
 
             // Genuinely allowed — return the real answer.
             allowedCount.incrementAndGet(); AppStats.recordAllowed(pkg)
-            DnsPacket.buildForwardedResponse(ipPacket, len, reply, reply.size)?.let { tunOut.write(it) }
+            LiveLog.add(pkg, q.domain, LiveLog.Verdict.ALLOWED)
+            DnsPacket.buildForwardedResponse(ipPacket, len, reply, reply.size)?.let { writeTun(tunOut, it) }
         } catch (e: Exception) {
-            Log.w(TAG, "fwd fail: $e")
+            Log.w(TAG, "answer fail: $e")
         }
     }
 
@@ -332,8 +496,8 @@ class GuardianVpnService : VpnService() {
         return try {
             val conn = URL("https://1.1.1.1/dns-query").openConnection() as HttpsURLConnection
             conn.requestMethod = "POST"
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
+            conn.connectTimeout = UPSTREAM_TIMEOUT_MS
+            conn.readTimeout = UPSTREAM_TIMEOUT_MS
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/dns-message")
             conn.setRequestProperty("Accept", "application/dns-message")
@@ -370,12 +534,53 @@ class GuardianVpnService : VpnService() {
         }
     }
 
+    /** Swap in a freshly downloaded filter without dropping a single lookup:
+     *  load off-thread (≈3 MB), then replace the reference in one write. */
+    private fun reloadFilterAsync() {
+        Thread({
+            try {
+                val f = BloomFilter.loadCurrent(this)
+                filter = f
+                Log.i(TAG, "filter reloaded live; items=${f.items}")
+            } catch (e: Exception) { Log.w(TAG, "filter reload failed, keeping current: $e") }
+        }, "guardian-filter-reload").start()
+    }
+
+    /** While paused, say so — and offer "Resume now" — so the break is never silent. */
+    private fun showPausedNotification() {
+        try {
+            val mgr = getSystemService(NotificationManager::class.java)
+            ensureChannel(mgr)
+            val resume = Intent(this, GuardianVpnService::class.java).setAction(ACTION_START)
+            val resumePi = if (Build.VERSION.SDK_INT >= 26)
+                PendingIntent.getForegroundService(this, 3, resume, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            else PendingIntent.getService(this, 3, resume, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val at = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                .format(java.util.Date(pausedUntil(this)))
+            mgr.notify(PAUSED_NOTIF_ID, Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("Noxa is paused")
+                .setContentText("Protection turns back on by itself at about $at")
+                .setSmallIcon(android.R.drawable.ic_media_pause)
+                .setContentIntent(PendingIntent.getActivity(this, 0,
+                    Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+                .addAction(Notification.Action.Builder(null, "Resume now", resumePi).build())
+                .setOngoing(true)
+                .build())
+        } catch (e: Exception) { Log.w(TAG, "paused notification failed: $e") }
+    }
+
     private fun stopVpn() {
         saveStats()
         AppStats.save(this)
+        DailyStats.save(this)
         running.set(false)
         isRunning.set(false)
+        NoxaWidget.refreshAll(this)
+        NoxaTileService.refresh(this)
         try { worker?.interrupt() } catch (_: Exception) {}
+        stopWorkers()
+        cache.clear()
+        LiveLog.clear()        // the live feed is memory-only and ends with the session
         try { tunnel?.close() } catch (_: Exception) {}
         tunnel = null
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -416,24 +621,44 @@ class GuardianVpnService : VpnService() {
     override fun onDestroy() { stopVpn(); super.onDestroy() }
 
     // --- notification (foreground service requirement) -----------------------
-    private fun buildNotification(): Notification {
-        val mgr = getSystemService(NotificationManager::class.java)
+    /** v1.7: the persistent notification carries today's count. Same ID +
+     *  onlyAlertOnce = a silent in-place update, no buzz, no new entry. */
+    private fun refreshNotification() {
+        try { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification()) }
+        catch (_: Exception) {}
+    }
+
+    private fun ensureChannel(mgr: NotificationManager) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             mgr.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Protection",
                     NotificationManager.IMPORTANCE_LOW)
             )
         }
+    }
+
+    private fun buildNotification(): Notification {
+        ensureChannel(getSystemService(NotificationManager::class.java))
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE
         )
+        // v1.5: a site broken by blocking? One tap pauses for 5 minutes and
+        // protection comes back by itself — no digging for the switch.
+        val pause = PendingIntent.getService(
+            this, 4, Intent(this, GuardianVpnService::class.java).setAction(ACTION_PAUSE),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val today = DailyStats.today()
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Noxa is protecting you")
-            .setContentText("Blocking trackers and ads")
+            .setContentText(if (today == 0L) "Blocking trackers and ads"
+                            else "%,d tracking attempts blocked today".format(today))
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(open)
+            .addAction(Notification.Action.Builder(null, "Pause 5 min", pause).build())
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .build()
     }
 }

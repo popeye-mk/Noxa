@@ -24,6 +24,7 @@ object AppStats {
     private const val KEY_USER_ALLOW = "user_allow"
     private const val KEY_COMPAT_SEEDED = "compat_seeded_v1"
     private const val KEY_NO_FILTER = "no_filter_apps"
+    private const val KEY_USER_BLOCK = "user_block"
 
     /** Used when we can't attribute a lookup to a specific app (e.g. system). */
     const val UNKNOWN = "(system / unknown)"
@@ -40,29 +41,53 @@ object AppStats {
     private val noFilter = ConcurrentHashMap<String, Boolean>()
     /** User's personal "never block this" list — overrides the tracker filter. */
     private val userAllow = ConcurrentHashMap<String, Boolean>()
+    /** v1.5: user's personal "always block this" list (e.g. from the Live feed). */
+    private val userBlock = ConcurrentHashMap<String, Boolean>()
 
     /** True if [host] (or a parent domain) is on the user's allowlist. */
-    fun isUserAllowed(host: String): Boolean {
-        if (userAllow.isEmpty()) return false
+    fun isUserAllowed(host: String): Boolean = matchesSet(userAllow, host)
+
+    /** True if [host] (or a parent domain) is on the user's own block list. */
+    fun isUserBlocked(host: String): Boolean = matchesSet(userBlock, host)
+
+    private fun matchesSet(set: ConcurrentHashMap<String, Boolean>, host: String): Boolean {
+        if (set.isEmpty()) return false
         var h = host.trim().lowercase().removeSuffix(".")
         while (h.contains('.')) {
-            if (userAllow.containsKey(h)) return true
+            if (set.containsKey(h)) return true
             h = h.substring(h.indexOf('.') + 1)
         }
         return false
     }
 
-    fun userAllowList(): List<String> = userAllow.keys.sorted()
-
-    fun addUserAllow(ctx: Context, domain: String) {
+    /** "https://Ads.Example.com/x" -> "ads.example.com"; null if not a domain. */
+    fun cleanDomain(domain: String): String? {
         val d = domain.trim().lowercase()
             .removePrefix("http://").removePrefix("https://")
             .substringBefore('/').substringBefore(':').removeSuffix(".")
-        if (d.contains('.')) { userAllow[d] = true; save(ctx) }
+        return if (d.contains('.')) d else null
+    }
+
+    fun userAllowList(): List<String> = userAllow.keys.sorted()
+
+    fun addUserAllow(ctx: Context, domain: String) {
+        val d = cleanDomain(domain) ?: return
+        userAllow[d] = true; userBlock.remove(d); save(ctx)
     }
 
     fun removeUserAllow(ctx: Context, domain: String) {
         userAllow.remove(domain); save(ctx)
+    }
+
+    fun userBlockList(): List<String> = userBlock.keys.sorted()
+
+    fun addUserBlock(ctx: Context, domain: String) {
+        val d = cleanDomain(domain) ?: return
+        userBlock[d] = true; userAllow.remove(d); save(ctx)
+    }
+
+    fun removeUserBlock(ctx: Context, domain: String) {
+        userBlock.remove(domain); save(ctx)
     }
 
     // --- "Don't filter this app" (VPN exclusion) -----------------------------
@@ -105,7 +130,22 @@ object AppStats {
     /** Every app we've seen (blocked or allowed), for the dashboard list. */
     fun seenApps(): Set<String> = (blocked.keys + allowed.keys).toSet()
 
+    @Volatile private var loaded = false
+
+    /** Read from disk ONCE per process. The service and every screen share this
+     *  object in-process, so after the first load memory is the live truth —
+     *  re-reading (each screen used to) silently dropped counts the service
+     *  hadn't saved yet. */
     fun load(ctx: Context) {
+        if (loaded) return
+        synchronized(this) {
+            if (loaded) return
+            loadFromDisk(ctx)
+            loaded = true
+        }
+    }
+
+    private fun loadFromDisk(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         readInto(p.getString(KEY_BLOCKED, "{}"), blocked)
         readInto(p.getString(KEY_ALLOWED, "{}"), allowed)
@@ -123,6 +163,11 @@ object AppStats {
         try {
             val arr = JSONArray(p.getString(KEY_NO_FILTER, "[]"))
             for (i in 0 until arr.length()) noFilter[arr.getString(i)] = true
+        } catch (_: Exception) {}
+        userBlock.clear()
+        try {
+            val arr = JSONArray(p.getString(KEY_USER_BLOCK, "[]"))
+            for (i in 0 until arr.length()) userBlock[arr.getString(i)] = true
         } catch (_: Exception) {}
         // App-compatibility defaults — SEEDED ONCE into the user's allowlist.
         // Some apps hard-refuse to start when their startup beacon is blocked
@@ -167,8 +212,51 @@ object AppStats {
             .putString(KEY_FIREWALL, JSONArray(firewall.keys.toList()).toString())
             .putString(KEY_USER_ALLOW, JSONArray(userAllow.keys.toList()).toString())
             .putString(KEY_NO_FILTER, JSONArray(noFilter.keys.toList()).toString())
+            .putString(KEY_USER_BLOCK, JSONArray(userBlock.keys.toList()).toString())
             .putString(KEY_COMPANIES, companies.toString())
             .apply()
+    }
+
+    // --- v1.6 backup / restore ----------------------------------------------
+    // The user's CHOICES only (lists + switches) — no stats, no history.
+
+    private const val BACKUP_FORMAT = "noxa-settings"
+    private const val MAX_ENTRIES = 10_000
+    private val PKG_RE = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
+
+    fun exportSettings(): String = JSONObject().apply {
+        put("format", BACKUP_FORMAT)
+        put("version", 1)
+        put("allowed_sites", JSONArray(userAllowList()))
+        put("blocked_sites", JSONArray(userBlockList()))
+        put("firewalled_apps", JSONArray(firewall.keys.sorted()))
+        put("excluded_apps", JSONArray(noFilter.keys.sorted()))
+        put("encrypted_dns", GuardianVpnService.encryptedDns.get())
+    }.toString(2)
+
+    /** Merge a backup into the current settings (never deletes anything).
+     *  Every entry is validated. Returns a plain-language summary; throws
+     *  IllegalArgumentException if the file isn't a Noxa backup. */
+    fun importSettings(ctx: Context, text: String): String {
+        val o = try { JSONObject(text) } catch (e: Exception) {
+            throw IllegalArgumentException("That file isn't a Noxa backup.")
+        }
+        require(o.optString("format") == BACKUP_FORMAT) { "That file isn't a Noxa backup." }
+        fun strings(key: String): List<String> {
+            val a = o.optJSONArray(key) ?: return emptyList()
+            return (0 until minOf(a.length(), MAX_ENTRIES)).mapNotNull { a.optString(it, null) }
+        }
+        var sites = 0; var apps = 0
+        for (d in strings("allowed_sites")) cleanDomain(d)?.let { if (userAllow.put(it, true) == null) sites++ }
+        for (d in strings("blocked_sites")) cleanDomain(d)?.let {
+            if (!userAllow.containsKey(it) && userBlock.put(it, true) == null) sites++
+        }
+        for (p in strings("firewalled_apps")) if (PKG_RE.matches(p) && firewall.put(p, true) == null) apps++
+        for (p in strings("excluded_apps")) if (PKG_RE.matches(p) && noFilter.put(p, true) == null) apps++
+        if (o.has("encrypted_dns")) GuardianVpnService.setEncryptedDns(ctx, o.optBoolean("encrypted_dns", true))
+        save(ctx)
+        return "Restored: $sites site(s), $apps app setting(s). " +
+            "Turn protection off and on to apply app exclusions."
     }
 
     /** Full per-app table as CSV, most-blocked first (used by Export). */

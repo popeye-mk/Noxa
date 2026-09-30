@@ -1,9 +1,9 @@
 import java.util.Properties
 import java.io.FileInputStream
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 // Release signing: reads keystore.properties (NEVER committed — .gitignored).
@@ -16,14 +16,15 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.guardian.app"
-    compileSdk = 34
+    compileSdk = 36        // build against the current platform; targetSdk stays
+                           // 34 until the newer runtime rules are tested on device
 
     defaultConfig {
         applicationId = "com.guardian.app"
         minSdk = 24            // Android 7.0 — covers ~99% of devices
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.3"
+        versionCode = 14
+        versionName = "1.7"
     }
 
     signingConfigs {
@@ -38,6 +39,12 @@ android {
     }
 
     buildTypes {
+        // Test builds install NEXT TO the real app ("Noxa TEST", own package),
+        // so trying one never replaces or wipes the user's installed Noxa.
+        debug {
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+        }
         release {
             // No minification: keeps the build reproducible/auditable — anyone
             // can diff the APK against the source. Size cost is acceptable.
@@ -54,8 +61,11 @@ android {
         // library works down to our minSdk (24). Harmless if not strictly needed.
         isCoreLibraryDesugaringEnabled = true
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    // Unit tests run on the plain JVM against stubbed Android classes; make
+    // the stubs return defaults (instead of throwing) so pure logic under test
+    // (DNS cache, filter, stats) never trips over an incidental Android call.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
     // The compiled Bloom filter ships as an asset; don't compress it.
     androidResources {
@@ -63,7 +73,17 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
 dependencies {
+    // Unit tests (app/src/test) — run by CI on every push: ./gradlew testDebugUnitTest
+    testImplementation("junit:junit:4.13.2")
+    // The real org.json for tests (the Android stub jar's JSONObject is empty).
+    testImplementation("org.json:json:20240303")
     // Tunnel (option 2): the official WireGuard library — Guardian's FIRST
     // third-party dependency. Used now to parse/validate a pasted config, and
     // to establish the tunnel in a later increment. It's open source, which
