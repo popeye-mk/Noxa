@@ -5,8 +5,9 @@ name: Rebuild blocklist
 # daily (FilterUpdater) and swap a newer list in live, so users get fresh
 # protection every week with zero manual work and no server of our own.
 #
-# On any other branch (or a push touching the build tools) it's a DRY RUN:
-# same build + checks, the result is uploaded as an artifact, nothing committed.
+# On any other branch it's a DRY RUN: same build + checks, the result is
+# uploaded as an artifact, nothing committed. On main every trigger commits —
+# including a merge that touches the build tools, so a fix ships at once.
 on:
   schedule:
     - cron: "17 4 * * 1"        # Mondays 04:17 UTC
@@ -73,7 +74,7 @@ jobs:
             build-tools/out/build-report.txt
 
       - name: Commit (main only)
-        if: github.ref == 'refs/heads/main' && github.event_name != 'push' && steps.stage.outputs.changed == 'true'
+        if: github.ref == 'refs/heads/main' && steps.stage.outputs.changed == 'true'
         run: |
           git config user.name "noxa-filter-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
