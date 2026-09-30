@@ -261,6 +261,88 @@ def dns_response_with_cname():
     return header + question + ans1 + ans2
 
 
+# ---- port of DnsCache helpers ----------------------------------------------
+MAX_TTL_S, NEGATIVE_TTL_S, TYPE_OPT = 300, 60, 41
+
+
+def u32(b, o): return (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]
+
+
+def skip_questions(p):
+    if len(p) < 12:
+        return None
+    pos = 12
+    for _ in range(u16(p, 4)):
+        pos = skip_name(p, pos, len(p)) + 4
+        if pos > len(p):
+            return None
+    return pos
+
+
+def cache_ttl_seconds(r):
+    if len(r) < 12 or r[2] & 0x02:
+        return None
+    if (r[3] & 0x0F) not in (0, 3):
+        return None
+    an = u16(r, 6)
+    pos = skip_questions(r)
+    if pos is None:
+        return None
+    mn = None
+    for _ in range(an + u16(r, 8)):
+        pos = skip_name(r, pos, len(r))
+        if pos + 10 > len(r):
+            return None
+        if u16(r, pos) != TYPE_OPT:
+            t = u32(r, pos + 4)
+            mn = t if mn is None else min(mn, t)
+        pos += 10 + u16(r, pos + 8)
+        if pos > len(r):
+            return None
+    ttl = NEGATIVE_TTL_S if mn is None else (min(mn, NEGATIVE_TTL_S) if an == 0 else mn)
+    return None if ttl <= 0 else min(ttl, MAX_TTL_S)
+
+
+def ttl_offsets(r):
+    pos = skip_questions(r)
+    if pos is None:
+        return None
+    out = []
+    for _ in range(u16(r, 6) + u16(r, 8) + u16(r, 10)):
+        pos = skip_name(r, pos, len(r))
+        if pos + 10 > len(r):
+            return None
+        if u16(r, pos) != TYPE_OPT:
+            out.append(pos + 4)
+        pos += 10 + u16(r, pos + 8)
+        if pos > len(r):
+            return None
+    return out
+
+
+def patch_for_query(reply, dns_query):
+    reply[0], reply[1] = dns_query[0], dns_query[1]
+    q_end = skip_questions(dns_query)
+    if q_end is not None and q_end <= len(reply) and skip_questions(reply) == q_end:
+        reply[12:q_end] = dns_query[12:q_end]
+
+
+def reply_id_matches(reply, query):
+    """resolvePlain: accept only a reply carrying the query's transaction ID."""
+    return len(reply) >= 12 and reply[0] == query[0] and reply[1] == query[1]
+
+
+def simple_reply(flags_lo=0x80, flags_hi=0x81, records=(), opt=False, name="example.com"):
+    """Response with A records of the given TTLs (+ optional EDNS OPT)."""
+    hdr = bytes([0xAB, 0xCD, flags_hi, flags_lo, 0, 1, 0, len(records), 0, 0, 0, 1 if opt else 0])
+    body = qname(name) + bytes([0, 1, 0, 1])
+    for ttl in records:
+        body += bytes([0xC0, 0x0C, 0, 1, 0, 1]) + ttl.to_bytes(4, "big") + bytes([0, 4, 9, 9, 9, 9])
+    if opt:
+        body += bytes([0, 0, TYPE_OPT, 0x10, 0, 0, 0, 0, 0, 0, 0])   # root, OPT, class, TTL, RDLEN=0
+    return hdr + body
+
+
 def check(name, cond):
     print(f"  [{'PASS' if cond else 'FAIL'}] {name}")
     assert cond, name
@@ -336,6 +418,38 @@ def main():
     check("extracted exactly one CNAME", len(targets) == 1)
     check("CNAME target decoded correctly", targets == ["tracker.evilcorp.com"])
     check("compressed answer-name skipped correctly", "metrics.site.com" not in targets)
+
+    print("DNS cache (TTL / ID / question patching):")
+    msg = dns_response_with_cname()
+    check("CNAME chain cached for min TTL (60s)", cache_ttl_seconds(msg) == 60)
+    check("one TTL offset per answer record", ttl_offsets(msg) is not None and len(ttl_offsets(msg)) == 2)
+    check("TTL capped at 5 min", cache_ttl_seconds(simple_reply(records=(86400, 3600))) == 300)
+    check("min TTL across records", cache_ttl_seconds(simple_reply(records=(900, 120))) == 120)
+    check("zero TTL -> not cached", cache_ttl_seconds(simple_reply(records=(0,))) is None)
+    check("SERVFAIL -> not cached", cache_ttl_seconds(simple_reply(flags_lo=0x82, records=(60,))) is None)
+    check("truncated (TC) -> not cached", cache_ttl_seconds(simple_reply(flags_hi=0x83, records=(60,))) is None)
+    check("NXDOMAIN cached 60s", cache_ttl_seconds(simple_reply(flags_lo=0x83)) == 60)
+    check("EDNS OPT ignored for TTL", cache_ttl_seconds(simple_reply(records=(200,), opt=True)) == 200)
+    check("EDNS OPT has no TTL offset", len(ttl_offsets(simple_reply(records=(200,), opt=True))) == 1)
+    check("truncated record -> not cached", cache_ttl_seconds(simple_reply(records=(60,))[:-3]) is None)
+
+    cached = bytearray(simple_reply(records=(200,), name="Example.COM"))
+    q = ipv4_query("eXample.com", TYPE_A, dns_id=0x7777)
+    pq = parse_query(q)
+    dns_q = q[pq["dns"]:]
+    patch_for_query(cached, dns_q)
+    check("cache hit carries the new query's ID", cached[0:2] == bytes([0x77, 0x77]))
+    check("cache hit echoes the app's exact question (0x20 case)",
+          cached[12:pq["qend"] - pq["dns"]] == dns_q[12:])
+    for off in ttl_offsets(cached):
+        cached[off:off + 4] = (42).to_bytes(4, "big")
+    check("remaining TTL rewritten", u32(cached, ttl_offsets(cached)[0]) == 42)
+    check("answer still parses after patching", cache_ttl_seconds(bytes(cached)) == 42)
+
+    print("Upstream reply ID matching:")
+    check("matching ID accepted", reply_id_matches(bytes([0x12, 0x34]) + bytes(10), bytes([0x12, 0x34])))
+    check("stale reply (other ID) rejected", not reply_id_matches(bytes([0x12, 0x35]) + bytes(10), bytes([0x12, 0x34])))
+    check("runt reply rejected", not reply_id_matches(bytes([0x12, 0x34]), bytes([0x12, 0x34])))
 
     print("\nAll packet-algorithm checks passed.")
 

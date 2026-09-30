@@ -19,8 +19,11 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
-import java.nio.ByteBuffer
+import java.net.SocketTimeoutException
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -49,6 +52,15 @@ class GuardianVpnService : VpnService() {
     private val running = AtomicBoolean(false)
 
     private lateinit var filter: BloomFilter
+
+    // Allowed lookups are resolved upstream by a few worker threads, so one
+    // slow answer (bad Wi-Fi, DoH timeout) can't stall every other app's DNS.
+    // The tun read loop only does the fast work: parse, filter, sinkhole.
+    private class Job(val packet: ByteArray, val len: Int, val q: DnsPacket.Query,
+                      val pkg: String, val skipCname: Boolean)
+    private val jobs = ArrayBlockingQueue<Job>(256)   // full -> drop; the app retries
+    private val workers = ArrayList<Thread>()
+    private val cache = DnsCache()
 
     // Phase 2: attribute each DNS query to the app that made it.
     private var connectivity: ConnectivityManager? = null
@@ -79,6 +91,8 @@ class GuardianVpnService : VpnService() {
         // Upstream resolver used for ALLOWED lookups (Cloudflare here; a
         // mainstream resolver keeps us in a large anonymity set — see mission).
         private val UPSTREAM_DNS = InetAddress.getByName("1.1.1.1")
+        private const val WORKERS = 4
+        private const val UPSTREAM_TIMEOUT_MS = 3000
 
         // Live counter the UI reads to show "X tracking attempts blocked".
         val blockedCount = AtomicLong(0)
@@ -113,6 +127,7 @@ class GuardianVpnService : VpnService() {
     }
 
     @Volatile private var dohRetryAt = 0L   // back-off clock when DoH is failing
+    private val dohFailures = AtomicInteger(0)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -217,12 +232,11 @@ class GuardianVpnService : VpnService() {
         val buffer = ByteArray(32767)
         var sinceFlush = 0
 
-        // One protected upstream socket, reused for every allowed lookup — far
-        // cheaper than opening/closing a fresh socket on every DNS query.
-        val upstream = DatagramSocket()
-        protect(upstream)
-        upstream.soTimeout = 3000
-        try { upstream.connect(InetSocketAddress(UPSTREAM_DNS, 53)) } catch (_: Exception) {}
+        synchronized(workers) {
+            repeat(WORKERS) { i ->
+                workers += Thread({ workerLoop(output) }, "guardian-dns-$i").also { it.start() }
+            }
+        }
 
         try {
             while (running.get()) {
@@ -242,29 +256,29 @@ class GuardianVpnService : VpnService() {
                         // every lookup it makes, on the same pipeline as everything else.
                         blockedCount.incrementAndGet()
                         AppStats.recordBlocked(pkg, "Blocked by you · Firewall")
-                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { output.write(it) }
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     AppStats.isUserAllowed(query.domain) -> {
                         // USER ALLOWLIST: "never block this" — overrides the tracker
                         // filter (and skips CNAME-uncloaking) so it always resolves.
-                        forward(buffer, length, query, pkg, upstream, output, skipCname = true)
+                        resolve(buffer, length, query, pkg, output, skipCname = true)
                     }
                     query.domain == DOH_CANARY -> {
                         // Disable browser auto-DoH: answer the canary NXDOMAIN.
                         blockedCount.incrementAndGet()
                         AppStats.recordBlocked(pkg, "DNS-over-HTTPS · Filter bypass")
-                        DnsPacket.buildNxDomainResponse(buffer, length, query)?.let { output.write(it) }
+                        DnsPacket.buildNxDomainResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     filter.matchesHostOrParent(query.domain) -> {
                         // BLOCKED: sinkhole (0.0.0.0) + record WHO the tracker is (Phase 3).
                         blockedCount.incrementAndGet()
                         AppStats.recordBlocked(pkg, Trackers.label(query.domain))
-                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { output.write(it) }
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
                         // ALLOWED (unless CNAME-uncloaking finds a tracker in the
-                        // answer). forward() does the allowed/blocked counting.
-                        forward(buffer, length, query, pkg, upstream, output)
+                        // answer). answer() does the allowed/blocked counting.
+                        resolve(buffer, length, query, pkg, output)
                     }
                 }
                 // Save the totals to disk every so often so a kill can't lose them.
@@ -273,7 +287,7 @@ class GuardianVpnService : VpnService() {
         } finally {
             saveStats()
             AppStats.save(this)
-            try { upstream.close() } catch (_: Exception) {}
+            stopWorkers()
         }
         // If we fell out of the loop while still "running", the tunnel died
         // (e.g. network change / EOF). Shut down cleanly instead of leaving a
@@ -281,30 +295,109 @@ class GuardianVpnService : VpnService() {
         if (running.get()) stopVpn()
     }
 
-    /** Relay an allowed DNS query upstream and write the answer back to the tun.
-     *  Prefers encrypted DNS (DoH); falls back to plain DNS so it never breaks.
-     *  Also CNAME-uncloaks: if the answer's CNAME chain points at a tracker, the
-     *  query is blocked instead (does the allowed/blocked counting itself). */
-    private fun forward(ipPacket: ByteArray, len: Int, q: DnsPacket.Query, pkg: String,
-                        sock: DatagramSocket, tunOut: FileOutputStream, skipCname: Boolean = false) {
-        try {
-            val payload = DnsPacket.extractUdpPayload(ipPacket, len) ?: return
+    /** Serialise tun writes: the read loop and the workers all answer apps. */
+    private fun writeTun(out: FileOutputStream, bytes: ByteArray) {
+        synchronized(out) { out.write(bytes) }
+    }
 
-            // Get the upstream answer — encrypted DNS preferred (30s back-off on
-            // failure so a blocked :443 can't stall every query), else plain DNS.
+    /** An allowed lookup: answer straight from the cache when we can (no
+     *  network at all), otherwise queue it for a worker to resolve upstream. */
+    private fun resolve(ipPacket: ByteArray, len: Int, q: DnsPacket.Query, pkg: String,
+                        tunOut: FileOutputStream, skipCname: Boolean = false) {
+        val payload = DnsPacket.extractUdpPayload(ipPacket, len) ?: return
+        val cached = cache.get(q, payload)
+        if (cached != null) {
+            answer(ipPacket, len, q, pkg, cached, tunOut, skipCname)
+            return
+        }
+        // The loop reuses its buffer, so the job gets its own copy.
+        if (!jobs.offer(Job(ipPacket.copyOf(len), len, q, pkg, skipCname)))
+            Log.w(TAG, "resolver queue full, dropping lookup (app will retry)")
+    }
+
+    /** One resolver worker: its own protected upstream socket, so replies can
+     *  never be read by the wrong thread. */
+    private fun workerLoop(tunOut: FileOutputStream) {
+        val sock = try {
+            DatagramSocket().also {
+                protect(it)
+                it.connect(InetSocketAddress(UPSTREAM_DNS, 53))
+            }
+        } catch (e: Exception) { Log.w(TAG, "worker socket failed: $e"); return }
+        try {
+            // Interrupted = this worker belongs to a stopped session; exit even
+            // if protection was already switched back on (new workers exist).
+            while (running.get() && !Thread.currentThread().isInterrupted) {
+                val job = try { jobs.poll(1, TimeUnit.SECONDS) } catch (_: InterruptedException) { break }
+                    ?: continue
+                forward(job, sock, tunOut)
+            }
+        } finally {
+            try { sock.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun stopWorkers() {
+        synchronized(workers) {
+            for (w in workers) try { w.interrupt() } catch (_: Exception) {}
+            workers.clear()
+        }
+        jobs.clear()
+    }
+
+    /** Relay an allowed DNS query upstream and write the answer back to the tun.
+     *  Prefers encrypted DNS (DoH); falls back to plain DNS so it never breaks. */
+    private fun forward(job: Job, sock: DatagramSocket, tunOut: FileOutputStream) {
+        try {
+            val payload = DnsPacket.extractUdpPayload(job.packet, job.len) ?: return
+
+            // Get the upstream answer — encrypted DNS preferred (growing back-off
+            // on failure so a blocked :443 can't stall every query), else plain DNS.
             var reply: ByteArray? = null
             if (encryptedDns.get() && System.currentTimeMillis() >= dohRetryAt) {
                 reply = resolveDoh(payload)
-                if (reply == null) dohRetryAt = System.currentTimeMillis() + 30_000L
+                if (reply == null) {
+                    // 5s, 10s, 20s, then every 30s while DoH stays unreachable.
+                    val n = dohFailures.incrementAndGet().coerceAtMost(4)
+                    dohRetryAt = System.currentTimeMillis() + minOf(30_000L, 5_000L shl (n - 1))
+                } else {
+                    dohFailures.set(0)
+                }
             }
-            if (reply == null) {
-                sock.send(java.net.DatagramPacket(payload, payload.size))
-                val buf = ByteArray(1500)
-                val resp = java.net.DatagramPacket(buf, buf.size)
-                sock.receive(resp)
-                reply = buf.copyOf(resp.length)
-            }
+            if (reply == null) reply = resolvePlain(payload, sock) ?: return
 
+            cache.put(job.q, reply)
+            answer(job.packet, job.len, job.q, job.pkg, reply, tunOut, job.skipCname)
+        } catch (e: Exception) {
+            Log.w(TAG, "fwd fail: $e")
+        }
+    }
+
+    /** Plain UDP DNS. Only accepts a reply whose transaction ID matches this
+     *  query: a late answer to an earlier, timed-out query can still arrive on
+     *  the socket and must never be handed to the wrong lookup. */
+    private fun resolvePlain(payload: ByteArray, sock: DatagramSocket): ByteArray? {
+        sock.send(java.net.DatagramPacket(payload, payload.size))
+        val deadline = System.currentTimeMillis() + UPSTREAM_TIMEOUT_MS
+        val buf = ByteArray(4096)
+        while (true) {
+            val left = deadline - System.currentTimeMillis()
+            if (left <= 0) return null
+            sock.soTimeout = left.toInt()
+            val resp = java.net.DatagramPacket(buf, buf.size)
+            try { sock.receive(resp) } catch (_: SocketTimeoutException) { return null }
+            if (resp.length >= 12 && buf[0] == payload[0] && buf[1] == payload[1])
+                return buf.copyOf(resp.length)
+            // stale reply for an earlier query — discard and keep waiting
+        }
+    }
+
+    /** Deliver an upstream (or cached) answer to the app. CNAME-uncloaks first:
+     *  if the answer's CNAME chain points at a tracker, the query is blocked
+     *  instead. Does the allowed/blocked counting itself. */
+    private fun answer(ipPacket: ByteArray, len: Int, q: DnsPacket.Query, pkg: String,
+                       reply: ByteArray, tunOut: FileOutputStream, skipCname: Boolean) {
+        try {
             // CNAME-uncloaking: a tracker hiding behind a first-party subdomain
             // shows up as a CNAME to a blocked domain — sinkhole it. (Skipped when
             // the user explicitly allowlisted the domain.)
@@ -313,15 +406,15 @@ class GuardianVpnService : VpnService() {
             if (cloaked != null) {
                 blockedCount.incrementAndGet()
                 AppStats.recordBlocked(pkg, "${Trackers.companyOf(Trackers.label(cloaked))} · CNAME-cloaked")
-                DnsPacket.buildSinkholeResponse(ipPacket, len, q)?.let { tunOut.write(it) }
+                DnsPacket.buildSinkholeResponse(ipPacket, len, q)?.let { writeTun(tunOut, it) }
                 return
             }
 
             // Genuinely allowed — return the real answer.
             allowedCount.incrementAndGet(); AppStats.recordAllowed(pkg)
-            DnsPacket.buildForwardedResponse(ipPacket, len, reply, reply.size)?.let { tunOut.write(it) }
+            DnsPacket.buildForwardedResponse(ipPacket, len, reply, reply.size)?.let { writeTun(tunOut, it) }
         } catch (e: Exception) {
-            Log.w(TAG, "fwd fail: $e")
+            Log.w(TAG, "answer fail: $e")
         }
     }
 
@@ -332,8 +425,8 @@ class GuardianVpnService : VpnService() {
         return try {
             val conn = URL("https://1.1.1.1/dns-query").openConnection() as HttpsURLConnection
             conn.requestMethod = "POST"
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
+            conn.connectTimeout = UPSTREAM_TIMEOUT_MS
+            conn.readTimeout = UPSTREAM_TIMEOUT_MS
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/dns-message")
             conn.setRequestProperty("Accept", "application/dns-message")
@@ -376,6 +469,8 @@ class GuardianVpnService : VpnService() {
         running.set(false)
         isRunning.set(false)
         try { worker?.interrupt() } catch (_: Exception) {}
+        stopWorkers()
+        cache.clear()
         try { tunnel?.close() } catch (_: Exception) {}
         tunnel = null
         stopForeground(STOP_FOREGROUND_REMOVE)

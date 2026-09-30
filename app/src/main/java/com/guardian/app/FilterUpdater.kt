@@ -5,6 +5,7 @@ import android.util.Log
 import org.json.JSONObject
 import java.io.File
 import java.net.URL
+import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 
 /**
@@ -55,15 +56,21 @@ object FilterUpdater {
     fun checkAndUpdate(ctx: Context): String {
         return try {
             val manifest = httpGet(MANIFEST_URL) ?: return "Couldn't reach the update source."
-            val remote = JSONObject(String(manifest, Charsets.UTF_8)).optString("built_at", "")
+            val json = JSONObject(String(manifest, Charsets.UTF_8))
+            val remote = json.optString("built_at", "")
             if (remote.isEmpty()) return "No update info available."
             val current = currentBuiltAt(ctx)
             // ISO-ish "YYYY-MM-DD HH:MM:SS" sorts correctly as text.
             if (remote <= current) return "Already up to date ($current)."
 
             val gbf = httpGet(FILTER_URL) ?: return "Couldn't download the new list."
-            if (gbf.size < 24 || String(gbf, 0, 4, Charsets.US_ASCII) != "GBF1")
+            if (!BloomFilter.isValidFile(gbf))
                 return "Downloaded file was invalid — kept the current list."
+            // Integrity: the manifest publishes the filter's SHA-256. A truncated
+            // or corrupted download (or one that raced a new commit) is refused.
+            val expected = json.optString("sha256", "")
+            if (expected.isNotEmpty() && !sha256Hex(gbf).equals(expected, ignoreCase = true))
+                return "Downloaded list failed its integrity check — kept the current list."
 
             val tmp = File(ctx.filesDir, "$FILTER_FILE.tmp")
             tmp.writeBytes(gbf)
@@ -87,6 +94,9 @@ object FilterUpdater {
         p.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
         Thread { try { checkAndUpdate(ctx) } catch (_: Exception) {} }.start()
     }
+
+    private fun sha256Hex(b: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(b).joinToString("") { "%02x".format(it) }
 
     private fun httpGet(url: String): ByteArray? = try {
         val c = URL(url).openConnection() as HttpsURLConnection
