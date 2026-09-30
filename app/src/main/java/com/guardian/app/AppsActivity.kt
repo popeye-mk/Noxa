@@ -210,7 +210,9 @@ class AppsActivity : Activity() {
             "🔧  Fix an app that won't work",
             "🔄  Update protection now",
             "🔋  Keep protection always on",
-            "📄  Save my report"
+            "📄  Save my report",
+            "💾  Back up my settings",
+            "📂  Restore settings from a backup"
         )
         AlertDialog.Builder(this)
             .setTitle("Settings & tools")
@@ -225,10 +227,67 @@ class AppsActivity : Activity() {
                     5 -> checkForUpdate()
                     6 -> openAlwaysOn()
                     7 -> exportCsv()
+                    8 -> pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
+                    9 -> pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
                 }
             }
             .setNegativeButton("Close", null)
             .show()
+    }
+
+    // --- v1.6 backup / restore (Android's own file picker: no storage permission)
+    private fun pickFile(action: String, req: Int) {
+        val i = Intent(action).addCategory(Intent.CATEGORY_OPENABLE).apply {
+            if (req == REQ_BACKUP) {
+                type = "application/json"
+                putExtra(Intent.EXTRA_TITLE, "noxa-settings.json")
+            } else {
+                type = "*/*"   // many pickers don't tag .json files as JSON
+            }
+        }
+        try { startActivityForResult(i, req) }
+        catch (_: Exception) {
+            Toast.makeText(this, "This device has no file picker (common on TVs).", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        val msg = try {
+            when (requestCode) {
+                REQ_BACKUP -> {
+                    contentResolver.openOutputStream(uri, "wt")!!.use {
+                        it.write(AppStats.exportSettings().toByteArray(Charsets.UTF_8))
+                    }
+                    "Backup saved. Keep it somewhere safe."
+                }
+                REQ_RESTORE -> {
+                    // A settings file is tiny; refuse anything big (wrong file).
+                    val bytes = contentResolver.openInputStream(uri)!!.use { it.readCapped(512 * 1024) }
+                        ?: throw IllegalArgumentException("That file is too big to be a Noxa backup.")
+                    val result = AppStats.importSettings(this, String(bytes, Charsets.UTF_8))
+                    setContentView(buildUi())
+                    result
+                }
+                else -> return
+            }
+        } catch (e: IllegalArgumentException) { e.message ?: "Couldn't read that file." }
+        catch (e: Exception) { "Couldn't use that file: ${e.message}" }
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+    }
+
+    /** readBytes with a cap: null if the stream is longer than [max]. */
+    private fun java.io.InputStream.readCapped(max: Int): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(8192)
+        while (true) {
+            val n = read(buf)
+            if (n < 0) return out.toByteArray()
+            out.write(buf, 0, n)
+            if (out.size() > max) return null
+        }
     }
 
     private fun checkForUpdate() {
@@ -314,4 +373,9 @@ class AppsActivity : Activity() {
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    companion object {
+        private const val REQ_BACKUP = 41
+        private const val REQ_RESTORE = 42
+    }
 }

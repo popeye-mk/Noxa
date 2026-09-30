@@ -212,6 +212,7 @@ class GuardianVpnService : VpnService() {
         // Phase 2: per-app stats + firewall, and the service to map query -> app.
         connectivity = getSystemService(ConnectivityManager::class.java)
         AppStats.load(this)
+        DailyStats.load(this)
         maybeResetStatsPeriod()          // roll the counters every 30 days
 
         val builder = Builder()
@@ -257,6 +258,8 @@ class GuardianVpnService : VpnService() {
         tunnel = fd
         running.set(true)
         isRunning.set(true)
+        NoxaWidget.refreshAll(this)
+        NoxaTileService.refresh(this)
         startForeground(NOTIF_ID, buildNotification())
         Log.i(TAG, "Guardian tun up; filter items=${filter.items}")
 
@@ -294,7 +297,7 @@ class GuardianVpnService : VpnService() {
                     AppStats.isFirewalled(pkg) -> {
                         // PER-APP FIREWALL: this app is blocked entirely — sinkhole
                         // every lookup it makes, on the same pipeline as everything else.
-                        blockedCount.incrementAndGet()
+                        onBlocked()
                         AppStats.recordBlocked(pkg, "Blocked by you · Firewall")
                         LiveLog.add(pkg, query.domain, LiveLog.Verdict.FIREWALL, "Whole app blocked by you")
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
@@ -302,7 +305,7 @@ class GuardianVpnService : VpnService() {
                     AppStats.isUserBlocked(query.domain) -> {
                         // USER BLOCK LIST (v1.5): "always block this" — the user's
                         // explicit choice wins over everything below, allowlist included.
-                        blockedCount.incrementAndGet()
+                        onBlocked()
                         AppStats.recordBlocked(pkg, "Blocked by you · Site")
                         LiveLog.add(pkg, query.domain, LiveLog.Verdict.MINE, "On your block list")
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
@@ -314,14 +317,14 @@ class GuardianVpnService : VpnService() {
                     }
                     query.domain == DOH_CANARY -> {
                         // Disable browser auto-DoH: answer the canary NXDOMAIN.
-                        blockedCount.incrementAndGet()
+                        onBlocked()
                         AppStats.recordBlocked(pkg, "DNS-over-HTTPS · Filter bypass")
                         LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, "DNS-over-HTTPS · Filter bypass")
                         DnsPacket.buildNxDomainResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     filter.matchesHostOrParent(query.domain) -> {
                         // BLOCKED: sinkhole (0.0.0.0) + record WHO the tracker is (Phase 3).
-                        blockedCount.incrementAndGet()
+                        onBlocked()
                         val label = Trackers.label(query.domain)
                         AppStats.recordBlocked(pkg, label)
                         LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, label)
@@ -336,7 +339,11 @@ class GuardianVpnService : VpnService() {
                 // Save the totals to disk every 30 s so a kill can't lose much —
                 // time-based, so a busy phone doesn't rewrite storage constantly.
                 val now = System.currentTimeMillis()
-                if (now - lastFlush >= 30_000L) { saveStats(); AppStats.save(this); lastFlush = now }
+                if (now - lastFlush >= 30_000L) {
+                    saveStats(); AppStats.save(this); DailyStats.save(this)
+                    NoxaWidget.refreshAll(this)          // home-screen count stays fresh
+                    lastFlush = now
+                }
             }
         } finally {
             saveStats()
@@ -347,6 +354,12 @@ class GuardianVpnService : VpnService() {
         // (e.g. network change / EOF). Shut down cleanly instead of leaving a
         // hot, half-dead service — the user can flip the switch to restart.
         if (running.get()) stopVpn()
+    }
+
+    /** Every block, from any path: the live counter + the per-day history. */
+    private fun onBlocked() {
+        blockedCount.incrementAndGet()
+        DailyStats.recordBlock()
     }
 
     /** Serialise tun writes: the read loop and the workers all answer apps. */
@@ -458,7 +471,7 @@ class GuardianVpnService : VpnService() {
             val cloaked = if (skipCname) null else DnsPacket.cnameTargets(reply, reply.size)
                 .firstOrNull { filter.matchesHostOrParent(it) }
             if (cloaked != null) {
-                blockedCount.incrementAndGet()
+                onBlocked()
                 val label = "${Trackers.companyOf(Trackers.label(cloaked))} · CNAME-cloaked"
                 AppStats.recordBlocked(pkg, label)
                 LiveLog.add(pkg, q.domain, LiveLog.Verdict.CLOAKED, "$label (hides $cloaked)")
@@ -558,8 +571,11 @@ class GuardianVpnService : VpnService() {
     private fun stopVpn() {
         saveStats()
         AppStats.save(this)
+        DailyStats.save(this)
         running.set(false)
         isRunning.set(false)
+        NoxaWidget.refreshAll(this)
+        NoxaTileService.refresh(this)
         try { worker?.interrupt() } catch (_: Exception) {}
         stopWorkers()
         cache.clear()
