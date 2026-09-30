@@ -420,6 +420,15 @@ def main():
     write_gbf(os.path.join(OUT, "guardian-default.gbf"), m_bits, k, n, ba)
     with open(os.path.join(OUT, "guardian-default.gbf"), "rb") as f:
         gbf_sha256 = hashlib.sha256(f.read()).hexdigest()
+
+    # Stalkerware list: a plain copy of UT1's category, shipped to the app so it
+    # can WARN about spyware (the main filter already blocks these domains).
+    stalk = sorted(set(read_category("stalkerware")))
+    stalk_text = "\n".join(stalk) + "\n"
+    with open(os.path.join(OUT, "stalkerware.txt"), "w") as f:
+        f.write(stalk_text)
+    stalk_sha256 = hashlib.sha256(stalk_text.encode("utf-8")).hexdigest()
+    print("Stalkerware list: %d domains" % len(stalk))
     build_s = time.time() - t0
 
     with open(os.path.join(OUT, "merged-domains.txt"), "w") as f:
@@ -430,6 +439,8 @@ def main():
         "built_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "false_positive_target": FALSE_POSITIVE_RATE,
         "sha256": gbf_sha256,   # app verifies downloads against this
+        "stalkerware_sha256": stalk_sha256,
+        "stalkerware_domains": len(stalk),
         "bloom": {"m_bits": m_bits, "k_hashes": k,
                   "size_mb": round(size_mb, 3), "items": n},
         "unique_domains": n,
