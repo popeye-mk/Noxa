@@ -38,6 +38,12 @@ android {
     }
 
     buildTypes {
+        // Test builds install NEXT TO the real app ("Noxa TEST", own package),
+        // so trying one never replaces or wipes the user's installed Noxa.
+        debug {
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+        }
         release {
             // No minification: keeps the build reproducible/auditable — anyone
             // can diff the APK against the source. Size cost is acceptable.
