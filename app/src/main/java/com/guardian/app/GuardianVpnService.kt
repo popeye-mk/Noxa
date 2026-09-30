@@ -513,14 +513,23 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    /** Best-effort: which app's package made this DNS query (needs API 29+, IPv4).
+    /** Best-effort: which app's package made this DNS query (needs API 29+).
+     *  IPv4 and IPv6 — modern phones send most DNS over IPv6, so v1.8 handles
+     *  both (before, every IPv6 lookup was filed under "system / unknown").
      *  Returns AppStats.UNKNOWN when it can't be attributed. */
     private fun ownerOf(buffer: ByteArray, q: DnsPacket.Query): String {
         val cm = connectivity
-        if (cm == null || Build.VERSION.SDK_INT < 29 || q.ipVersion != 4) return AppStats.UNKNOWN
+        if (cm == null || Build.VERSION.SDK_INT < 29) return AppStats.UNKNOWN
         return try {
-            val src = InetAddress.getByAddress(buffer.copyOfRange(12, 16))
-            val dst = InetAddress.getByAddress(buffer.copyOfRange(16, 20))
+            val src: InetAddress
+            val dst: InetAddress
+            if (q.ipVersion == 6) {
+                src = InetAddress.getByAddress(buffer.copyOfRange(8, 24))
+                dst = InetAddress.getByAddress(buffer.copyOfRange(24, 40))
+            } else {
+                src = InetAddress.getByAddress(buffer.copyOfRange(12, 16))
+                dst = InetAddress.getByAddress(buffer.copyOfRange(16, 20))
+            }
             val sport = ((buffer[q.udpStart].toInt() and 0xFF) shl 8) or
                 (buffer[q.udpStart + 1].toInt() and 0xFF)
             val uid = cm.getConnectionOwnerUid(
