@@ -36,6 +36,9 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
 - **Watch it live** — see every app's lookups as they happen; tap one to allow or block that site on the spot. Kept in memory only, never saved.
 - **Your own lists** — *Allowed sites* (never block) and *My blocked sites* (always block), editable any time.
+- **Home-screen widget + 7-day chart** — status, blocked-today and an on/off button on your home screen; a week of blocked trackers at a glance.
+- **Fresh lists every week** — a GitHub Action rebuilds the filter from every source each Monday and ships it only if strict safety checks pass (no false negatives, no blocked banks/connectivity/messaging apps, no suspicious size swings). Phones pick it up by themselves.
+- **Backup & restore** — save your allowed/blocked sites and app settings to a file, restore them on a new phone.
 - **Quick Settings tile + "Pause 5 min"** — on/off from the pull-down shade; a one-tap timed pause in the notification that turns itself back on.
 - **30-day rolling stats**, CSV export, first-run explainer.
 - **Zero telemetry, verifiable.** No location permission, no accounts, nothing phones home.

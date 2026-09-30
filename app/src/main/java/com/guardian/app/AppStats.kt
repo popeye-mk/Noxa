@@ -130,7 +130,22 @@ object AppStats {
     /** Every app we've seen (blocked or allowed), for the dashboard list. */
     fun seenApps(): Set<String> = (blocked.keys + allowed.keys).toSet()
 
+    @Volatile private var loaded = false
+
+    /** Read from disk ONCE per process. The service and every screen share this
+     *  object in-process, so after the first load memory is the live truth —
+     *  re-reading (each screen used to) silently dropped counts the service
+     *  hadn't saved yet. */
     fun load(ctx: Context) {
+        if (loaded) return
+        synchronized(this) {
+            if (loaded) return
+            loadFromDisk(ctx)
+            loaded = true
+        }
+    }
+
+    private fun loadFromDisk(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         readInto(p.getString(KEY_BLOCKED, "{}"), blocked)
         readInto(p.getString(KEY_ALLOWED, "{}"), allowed)
@@ -200,6 +215,48 @@ object AppStats {
             .putString(KEY_USER_BLOCK, JSONArray(userBlock.keys.toList()).toString())
             .putString(KEY_COMPANIES, companies.toString())
             .apply()
+    }
+
+    // --- v1.6 backup / restore ----------------------------------------------
+    // The user's CHOICES only (lists + switches) — no stats, no history.
+
+    private const val BACKUP_FORMAT = "noxa-settings"
+    private const val MAX_ENTRIES = 10_000
+    private val PKG_RE = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
+
+    fun exportSettings(): String = JSONObject().apply {
+        put("format", BACKUP_FORMAT)
+        put("version", 1)
+        put("allowed_sites", JSONArray(userAllowList()))
+        put("blocked_sites", JSONArray(userBlockList()))
+        put("firewalled_apps", JSONArray(firewall.keys.sorted()))
+        put("excluded_apps", JSONArray(noFilter.keys.sorted()))
+        put("encrypted_dns", GuardianVpnService.encryptedDns.get())
+    }.toString(2)
+
+    /** Merge a backup into the current settings (never deletes anything).
+     *  Every entry is validated. Returns a plain-language summary; throws
+     *  IllegalArgumentException if the file isn't a Noxa backup. */
+    fun importSettings(ctx: Context, text: String): String {
+        val o = try { JSONObject(text) } catch (e: Exception) {
+            throw IllegalArgumentException("That file isn't a Noxa backup.")
+        }
+        require(o.optString("format") == BACKUP_FORMAT) { "That file isn't a Noxa backup." }
+        fun strings(key: String): List<String> {
+            val a = o.optJSONArray(key) ?: return emptyList()
+            return (0 until minOf(a.length(), MAX_ENTRIES)).mapNotNull { a.optString(it, null) }
+        }
+        var sites = 0; var apps = 0
+        for (d in strings("allowed_sites")) cleanDomain(d)?.let { if (userAllow.put(it, true) == null) sites++ }
+        for (d in strings("blocked_sites")) cleanDomain(d)?.let {
+            if (!userAllow.containsKey(it) && userBlock.put(it, true) == null) sites++
+        }
+        for (p in strings("firewalled_apps")) if (PKG_RE.matches(p) && firewall.put(p, true) == null) apps++
+        for (p in strings("excluded_apps")) if (PKG_RE.matches(p) && noFilter.put(p, true) == null) apps++
+        if (o.has("encrypted_dns")) GuardianVpnService.setEncryptedDns(ctx, o.optBoolean("encrypted_dns", true))
+        save(ctx)
+        return "Restored: $sites site(s), $apps app setting(s). " +
+            "Turn protection off and on to apply app exclusions."
     }
 
     /** Full per-app table as CSV, most-blocked first (used by Export). */

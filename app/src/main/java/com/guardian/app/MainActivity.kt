@@ -24,6 +24,7 @@ class MainActivity : Activity() {
     private lateinit var toggle: Switch
     private lateinit var status: TextView
     private lateinit var counter: TextView
+    private lateinit var week: WeekChartView
     private val ui = Handler(Looper.getMainLooper())
 
     // The main switch means "am I protected?" — ON if EITHER the blocker or the
@@ -47,6 +48,8 @@ class MainActivity : Activity() {
         toggle = findViewById(R.id.toggle)
         status = findViewById(R.id.status)
         counter = findViewById(R.id.counter)
+        week = findViewById(R.id.week)
+        DailyStats.load(this)
 
         toggle.setOnCheckedChangeListener(toggleListener)
 
@@ -58,7 +61,6 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.live).setOnClickListener {
             startActivity(Intent(this, LiveActivity::class.java))
         }
-        tick()
         ensureNotificationPermission()
         maybeShowIntro()
     }
@@ -98,8 +100,15 @@ class MainActivity : Activity() {
 
     /** Whenever the screen comes to the front, show the switch's REAL state —
      *  it may be running because Always-on VPN started it without the app open. */
+    override fun onPause() {
+        super.onPause()
+        ui.removeCallbacksAndMessages(null)   // no ticking while the screen is hidden
+    }
+
     override fun onResume() {
         super.onResume()
+        ui.removeCallbacksAndMessages(null)
+        tick()
         val blockerOn = GuardianVpnService.isRunning.get()
         val tunnelOn = TunnelController.isUp
         val protectedNow = blockerOn || tunnelOn      // ON = protected by EITHER
@@ -182,6 +191,7 @@ class MainActivity : Activity() {
         val saved = getSharedPreferences(GuardianVpnService.PREFS, MODE_PRIVATE)
             .getLong(GuardianVpnService.KEY_BLOCKED, 0L)
         counter.text = getString(R.string.blocked_count, maxOf(live, saved))
+        week.setDays(DailyStats.lastDays(7))
         ui.postDelayed({ tick() }, 1000)
     }
 }

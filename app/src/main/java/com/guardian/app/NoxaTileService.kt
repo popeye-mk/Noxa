@@ -14,6 +14,16 @@ import android.service.quicksettings.TileService
  */
 class NoxaTileService : TileService() {
 
+    companion object {
+        /** Ask the system to redraw the tile now (protection turned on/off
+         *  elsewhere) instead of waiting until the shade is next opened. */
+        fun refresh(ctx: android.content.Context) {
+            try {
+                requestListeningState(ctx, android.content.ComponentName(ctx, NoxaTileService::class.java))
+            } catch (_: Exception) {}
+        }
+    }
+
     override fun onStartListening() {
         super.onStartListening()
         refresh()

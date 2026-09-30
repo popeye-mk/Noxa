@@ -6,4 +6,6 @@
     <string name="blocked_count">%1$d tracking attempts blocked (last 30 days)</string>
     <string name="per_app_details">Per-app details ›</string>
     <string name="watch_live">📡 Watch it live ›</string>
+    <string name="widget_description">Protection status, trackers blocked today, and an on/off button.</string>
+    <string name="week_title">Blocked per day — last 7 days</string>
 </resources>
