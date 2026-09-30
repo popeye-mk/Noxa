@@ -200,7 +200,9 @@ class GuardianVpnService : VpnService() {
     private fun startVpn() {
         if (running.get()) return
         filter = BloomFilter.loadCurrent(this)          // downloaded update, else bundled
+        Stalkerware.load(this)
         FilterUpdater.autoCheck(this)                   // quiet once-a-day refresh
+        AppUpdater.autoCheck(this)                      // "a newer Noxa is available"
 
         // Restore the saved totals so the counter continues instead of resetting
         // to 0 whenever the app/process was killed (MIUI does this aggressively).
@@ -325,9 +327,11 @@ class GuardianVpnService : VpnService() {
                     filter.matchesHostOrParent(query.domain) -> {
                         // BLOCKED: sinkhole (0.0.0.0) + record WHO the tracker is (Phase 3).
                         onBlocked()
-                        val label = Trackers.label(query.domain)
+                        val spy = Stalkerware.matches(query.domain)
+                        val label = if (spy) Stalkerware.LABEL else Trackers.label(query.domain)
                         AppStats.recordBlocked(pkg, label)
-                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, label)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, if (spy) "⚠ $label" else label)
+                        if (spy) Stalkerware.alert(this, pkg, query.domain)
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
@@ -541,6 +545,7 @@ class GuardianVpnService : VpnService() {
             try {
                 val f = BloomFilter.loadCurrent(this)
                 filter = f
+                Stalkerware.load(this)
                 Log.i(TAG, "filter reloaded live; items=${f.items}")
             } catch (e: Exception) { Log.w(TAG, "filter reload failed, keeping current: $e") }
         }, "guardian-filter-reload").start()

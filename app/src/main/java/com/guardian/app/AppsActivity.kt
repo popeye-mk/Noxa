@@ -212,7 +212,8 @@ class AppsActivity : Activity() {
             "🔋  Keep protection always on",
             "📄  Save my report",
             "💾  Back up my settings",
-            "📂  Restore settings from a backup"
+            "📂  Restore settings from a backup",
+            "⬆️  Check for a new Noxa version"
         )
         AlertDialog.Builder(this)
             .setTitle("Settings & tools")
@@ -229,6 +230,7 @@ class AppsActivity : Activity() {
                     7 -> exportCsv()
                     8 -> pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
                     9 -> pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
+                    10 -> checkAppUpdate()
                 }
             }
             .setNegativeButton("Close", null)
@@ -288,6 +290,14 @@ class AppsActivity : Activity() {
             out.write(buf, 0, n)
             if (out.size() > max) return null
         }
+    }
+
+    private fun checkAppUpdate() {
+        Toast.makeText(this, "Checking…", Toast.LENGTH_SHORT).show()
+        Thread {
+            val msg = AppUpdater.checkNow(this@AppsActivity)
+            runOnUiThread { Toast.makeText(this@AppsActivity, msg, Toast.LENGTH_LONG).show() }
+        }.start()
     }
 
     private fun checkForUpdate() {

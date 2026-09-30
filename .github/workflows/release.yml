@@ -1,0 +1,88 @@
+name: Publish signed release
+
+# Publishing from your phone: create a Release on GitHub (tag "v1.8", target
+# main) and this builds a SIGNED APK with the real Noxa key and attaches it
+# as noxa-v1.8.apk — so it installs over the previous version.
+#
+# One-time setup (repo → Settings → Secrets and variables → Actions):
+#   NOXA_KEYSTORE_BASE64   base64 of the .jks file   (base64 -w0 noxa.jks)
+#   NOXA_KEYSTORE_PASSWORD, NOXA_KEY_ALIAS, NOXA_KEY_PASSWORD
+# See docs/FDROID-AND-RELEASE.md. Without them this job fails loudly rather
+# than attaching an unsigned or test build to a public release.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # to attach the APK to the release
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check signing secrets are set
+        env:
+          KS: ${{ secrets.NOXA_KEYSTORE_BASE64 }}
+          KP: ${{ secrets.NOXA_KEYSTORE_PASSWORD }}
+          KA: ${{ secrets.NOXA_KEY_ALIAS }}
+          KK: ${{ secrets.NOXA_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KS" ] || [ -z "$KP" ] || [ -z "$KA" ] || [ -z "$KK" ]; then
+            echo "::error::Signing secrets missing. Add NOXA_KEYSTORE_BASE64, NOXA_KEYSTORE_PASSWORD, NOXA_KEY_ALIAS, NOXA_KEY_PASSWORD in Settings → Secrets → Actions (see docs/FDROID-AND-RELEASE.md)."
+            exit 1
+          fi
+
+      - name: Packet-algorithm checks
+        run: python3 build-tools/test_packets.py
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testReleaseUnitTest
+
+      - name: Write signing config (never printed, deleted after)
+        env:
+          KS: ${{ secrets.NOXA_KEYSTORE_BASE64 }}
+          KP: ${{ secrets.NOXA_KEYSTORE_PASSWORD }}
+          KA: ${{ secrets.NOXA_KEY_ALIAS }}
+          KK: ${{ secrets.NOXA_KEY_PASSWORD }}
+        run: |
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/noxa.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/noxa.jks"
+            echo "storePassword=$KP"
+            echo "keyAlias=$KA"
+            echo "keyPassword=$KK"
+          } > keystore.properties
+
+      - name: Build signed release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Verify the APK is signed with the release key
+        run: |
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f keystore.properties "$RUNNER_TEMP/noxa.jks"
+
+      - name: Attach APK to the release
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "noxa-${TAG}.apk"
+          sha256sum "noxa-${TAG}.apk" > "noxa-${TAG}.apk.sha256"
+          gh release upload "$TAG" "noxa-${TAG}.apk" "noxa-${TAG}.apk.sha256" --clobber
