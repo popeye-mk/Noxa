@@ -79,7 +79,8 @@ object FilterUpdater {
 
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString(KEY_BUILT_AT, remote).apply()
-            "Updated to $remote — turn protection off and on to apply."
+            GuardianVpnService.requestFilterReload()   // running service swaps it in live
+            "Updated to $remote — already active."
         } catch (e: Exception) {
             Log.w(TAG, "update failed: $e")
             "Update check failed: ${e.message}"

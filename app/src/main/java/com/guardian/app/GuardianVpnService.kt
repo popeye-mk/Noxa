@@ -51,7 +51,8 @@ class GuardianVpnService : VpnService() {
     private var worker: Thread? = null
     private val running = AtomicBoolean(false)
 
-    private lateinit var filter: BloomFilter
+    // Volatile: a downloaded update is swapped in live (v1.5), no restart needed.
+    @Volatile private lateinit var filter: BloomFilter
 
     // Allowed lookups are resolved upstream by a few worker threads, so one
     // slow answer (bad Wi-Fi, DoH timeout) can't stall every other app's DNS.
@@ -69,6 +70,9 @@ class GuardianVpnService : VpnService() {
     companion object {
         const val ACTION_START = "com.guardian.app.START"
         const val ACTION_STOP = "com.guardian.app.STOP"
+        const val ACTION_PAUSE = "com.guardian.app.PAUSE"
+        const val PAUSE_MS = 5L * 60 * 1000
+        private const val PAUSED_NOTIF_ID = 2
         private const val CHANNEL_ID = "guardian_protection"
         private const val NOTIF_ID = 1
         private const val TAG = "Guardian"
@@ -118,6 +122,22 @@ class GuardianVpnService : VpnService() {
         // the watchdog can tell "killed by the OS" (restart!) apart from
         // "turned off by the user" (leave it off).
         private const val KEY_WANT = "protection_wanted"
+        private const val KEY_PAUSED_UNTIL = "paused_until"
+
+        /** v1.5 "Pause 5 min": protection is off until this time, then the
+         *  watchdog brings it back. 0 = not paused. */
+        fun pausedUntil(ctx: Context): Long =
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_PAUSED_UNTIL, 0L)
+        fun isPaused(ctx: Context): Boolean = pausedUntil(ctx) > System.currentTimeMillis()
+        private fun setPausedUntil(ctx: Context, t: Long) {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putLong(KEY_PAUSED_UNTIL, t).apply()
+        }
+
+        // Set by FilterUpdater after it installs a newer list; the running
+        // service picks it up on its next lookup and swaps the filter live.
+        private val filterReload = AtomicBoolean(false)
+        fun requestFilterReload() = filterReload.set(true)
         fun wantsProtection(ctx: Context): Boolean =
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WANT, false)
         fun setWantsProtection(ctx: Context, on: Boolean) {
@@ -133,7 +153,17 @@ class GuardianVpnService : VpnService() {
         if (intent?.action == ACTION_STOP) {
             setWantsProtection(this, false)      // the USER said stop —
             WatchdogReceiver.cancel(this)        // the watchdog must not resurrect it
+            setPausedUntil(this, 0L)             // a real "off" also ends any pause
+            getSystemService(NotificationManager::class.java).cancel(PAUSED_NOTIF_ID)
             stopVpn()
+            return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_PAUSE) {
+            // Keep wantsProtection = true: this is a timed break, not "off".
+            setPausedUntil(this, System.currentTimeMillis() + PAUSE_MS)
+            WatchdogReceiver.scheduleResume(this, PAUSE_MS)
+            stopVpn()
+            showPausedNotification()
             return START_NOT_STICKY
         }
         // Go foreground IMMEDIATELY: when the watchdog restarts us from the
@@ -154,6 +184,14 @@ class GuardianVpnService : VpnService() {
             return START_NOT_STICKY
         }
         setWantsProtection(this, true)
+        // An explicit start ends any pause ("Resume now", the switch, the tile).
+        // A sticky/watchdog restart while still paused stays off.
+        if (intent == null && isPaused(this)) {
+            stopForeground(true); stopSelf()
+            return START_NOT_STICKY
+        }
+        setPausedUntil(this, 0L)
+        getSystemService(NotificationManager::class.java).cancel(PAUSED_NOTIF_ID)
         WatchdogReceiver.schedule(this)
         startVpn()
         return START_STICKY
@@ -230,7 +268,7 @@ class GuardianVpnService : VpnService() {
         val input = FileInputStream(tun.fileDescriptor)
         val output = FileOutputStream(tun.fileDescriptor)
         val buffer = ByteArray(32767)
-        var sinceFlush = 0
+        var lastFlush = System.currentTimeMillis()
 
         synchronized(workers) {
             repeat(WORKERS) { i ->
@@ -250,12 +288,23 @@ class GuardianVpnService : VpnService() {
                 val query = DnsPacket.parseQuery(buffer, length) ?: continue
                 val pkg = ownerOf(buffer, query)   // which app made this lookup
 
+                if (filterReload.compareAndSet(true, false)) reloadFilterAsync()
+
                 when {
                     AppStats.isFirewalled(pkg) -> {
                         // PER-APP FIREWALL: this app is blocked entirely — sinkhole
                         // every lookup it makes, on the same pipeline as everything else.
                         blockedCount.incrementAndGet()
                         AppStats.recordBlocked(pkg, "Blocked by you · Firewall")
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.FIREWALL, "Whole app blocked by you")
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
+                    }
+                    AppStats.isUserBlocked(query.domain) -> {
+                        // USER BLOCK LIST (v1.5): "always block this" — the user's
+                        // explicit choice wins over everything below, allowlist included.
+                        blockedCount.incrementAndGet()
+                        AppStats.recordBlocked(pkg, "Blocked by you · Site")
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.MINE, "On your block list")
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     AppStats.isUserAllowed(query.domain) -> {
@@ -267,12 +316,15 @@ class GuardianVpnService : VpnService() {
                         // Disable browser auto-DoH: answer the canary NXDOMAIN.
                         blockedCount.incrementAndGet()
                         AppStats.recordBlocked(pkg, "DNS-over-HTTPS · Filter bypass")
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, "DNS-over-HTTPS · Filter bypass")
                         DnsPacket.buildNxDomainResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     filter.matchesHostOrParent(query.domain) -> {
                         // BLOCKED: sinkhole (0.0.0.0) + record WHO the tracker is (Phase 3).
                         blockedCount.incrementAndGet()
-                        AppStats.recordBlocked(pkg, Trackers.label(query.domain))
+                        val label = Trackers.label(query.domain)
+                        AppStats.recordBlocked(pkg, label)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, label)
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
@@ -281,8 +333,10 @@ class GuardianVpnService : VpnService() {
                         resolve(buffer, length, query, pkg, output)
                     }
                 }
-                // Save the totals to disk every so often so a kill can't lose them.
-                if (++sinceFlush >= 50) { saveStats(); AppStats.save(this); sinceFlush = 0 }
+                // Save the totals to disk every 30 s so a kill can't lose much —
+                // time-based, so a busy phone doesn't rewrite storage constantly.
+                val now = System.currentTimeMillis()
+                if (now - lastFlush >= 30_000L) { saveStats(); AppStats.save(this); lastFlush = now }
             }
         } finally {
             saveStats()
@@ -405,13 +459,16 @@ class GuardianVpnService : VpnService() {
                 .firstOrNull { filter.matchesHostOrParent(it) }
             if (cloaked != null) {
                 blockedCount.incrementAndGet()
-                AppStats.recordBlocked(pkg, "${Trackers.companyOf(Trackers.label(cloaked))} · CNAME-cloaked")
+                val label = "${Trackers.companyOf(Trackers.label(cloaked))} · CNAME-cloaked"
+                AppStats.recordBlocked(pkg, label)
+                LiveLog.add(pkg, q.domain, LiveLog.Verdict.CLOAKED, "$label (hides $cloaked)")
                 DnsPacket.buildSinkholeResponse(ipPacket, len, q)?.let { writeTun(tunOut, it) }
                 return
             }
 
             // Genuinely allowed — return the real answer.
             allowedCount.incrementAndGet(); AppStats.recordAllowed(pkg)
+            LiveLog.add(pkg, q.domain, LiveLog.Verdict.ALLOWED)
             DnsPacket.buildForwardedResponse(ipPacket, len, reply, reply.size)?.let { writeTun(tunOut, it) }
         } catch (e: Exception) {
             Log.w(TAG, "answer fail: $e")
@@ -463,6 +520,41 @@ class GuardianVpnService : VpnService() {
         }
     }
 
+    /** Swap in a freshly downloaded filter without dropping a single lookup:
+     *  load off-thread (≈3 MB), then replace the reference in one write. */
+    private fun reloadFilterAsync() {
+        Thread({
+            try {
+                val f = BloomFilter.loadCurrent(this)
+                filter = f
+                Log.i(TAG, "filter reloaded live; items=${f.items}")
+            } catch (e: Exception) { Log.w(TAG, "filter reload failed, keeping current: $e") }
+        }, "guardian-filter-reload").start()
+    }
+
+    /** While paused, say so — and offer "Resume now" — so the break is never silent. */
+    private fun showPausedNotification() {
+        try {
+            val mgr = getSystemService(NotificationManager::class.java)
+            ensureChannel(mgr)
+            val resume = Intent(this, GuardianVpnService::class.java).setAction(ACTION_START)
+            val resumePi = if (Build.VERSION.SDK_INT >= 26)
+                PendingIntent.getForegroundService(this, 3, resume, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            else PendingIntent.getService(this, 3, resume, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val at = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                .format(java.util.Date(pausedUntil(this)))
+            mgr.notify(PAUSED_NOTIF_ID, Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("Noxa is paused")
+                .setContentText("Protection turns back on by itself at about $at")
+                .setSmallIcon(android.R.drawable.ic_media_pause)
+                .setContentIntent(PendingIntent.getActivity(this, 0,
+                    Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+                .addAction(Notification.Action.Builder(null, "Resume now", resumePi).build())
+                .setOngoing(true)
+                .build())
+        } catch (e: Exception) { Log.w(TAG, "paused notification failed: $e") }
+    }
+
     private fun stopVpn() {
         saveStats()
         AppStats.save(this)
@@ -471,6 +563,7 @@ class GuardianVpnService : VpnService() {
         try { worker?.interrupt() } catch (_: Exception) {}
         stopWorkers()
         cache.clear()
+        LiveLog.clear()        // the live feed is memory-only and ends with the session
         try { tunnel?.close() } catch (_: Exception) {}
         tunnel = null
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -511,23 +604,33 @@ class GuardianVpnService : VpnService() {
     override fun onDestroy() { stopVpn(); super.onDestroy() }
 
     // --- notification (foreground service requirement) -----------------------
-    private fun buildNotification(): Notification {
-        val mgr = getSystemService(NotificationManager::class.java)
+    private fun ensureChannel(mgr: NotificationManager) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             mgr.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Protection",
                     NotificationManager.IMPORTANCE_LOW)
             )
         }
+    }
+
+    private fun buildNotification(): Notification {
+        ensureChannel(getSystemService(NotificationManager::class.java))
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE
+        )
+        // v1.5: a site broken by blocking? One tap pauses for 5 minutes and
+        // protection comes back by itself — no digging for the switch.
+        val pause = PendingIntent.getService(
+            this, 4, Intent(this, GuardianVpnService::class.java).setAction(ACTION_PAUSE),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Noxa is protecting you")
             .setContentText("Blocking trackers and ads")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(open)
+            .addAction(Notification.Action.Builder(null, "Pause 5 min", pause).build())
             .setOngoing(true)
             .build()
     }

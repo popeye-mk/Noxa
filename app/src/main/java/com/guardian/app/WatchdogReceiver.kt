@@ -27,6 +27,7 @@ class WatchdogReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) schedule(ctx)
         if (!GuardianVpnService.wantsProtection(ctx)) return   // user turned it off
         if (GuardianVpnService.isRunning.get()) return          // alive — nothing to do
+        if (GuardianVpnService.isPaused(ctx)) return            // "Pause 5 min" still running
         if (TunnelController.isUp) return   // the user's TUNNEL holds the VPN slot — never steal it
         if (VpnService.prepare(ctx) != null) return             // permission revoked — needs the app UI
         val svc = Intent(ctx, GuardianVpnService::class.java)
@@ -39,6 +40,7 @@ class WatchdogReceiver : BroadcastReceiver() {
 
     companion object {
         private const val REQ = 1001
+        private const val REQ_RESUME = 1002
         private const val INTERVAL_MS = 15L * 60 * 1000
 
         private fun pending(ctx: Context): PendingIntent =
@@ -56,8 +58,26 @@ class WatchdogReceiver : BroadcastReceiver() {
             )
         }
 
+        /** v1.5 "Pause 5 min": one extra alarm that ends the pause on time
+         *  (the 15-min watchdog alone could leave it off for up to 20 min). */
+        fun scheduleResume(ctx: Context, afterMs: Long) {
+            val pi = PendingIntent.getBroadcast(
+                ctx, REQ_RESUME, Intent(ctx, WatchdogReceiver::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val at = SystemClock.elapsedRealtime() + afterMs + 1000   // just past the pause
+            val am = ctx.getSystemService(AlarmManager::class.java)
+            if (Build.VERSION.SDK_INT >= 23)
+                am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, pi)
+            else am.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, pi)
+        }
+
         fun cancel(ctx: Context) {
-            ctx.getSystemService(AlarmManager::class.java).cancel(pending(ctx))
+            val am = ctx.getSystemService(AlarmManager::class.java)
+            am.cancel(pending(ctx))
+            am.cancel(PendingIntent.getBroadcast(
+                ctx, REQ_RESUME, Intent(ctx, WatchdogReceiver::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
         }
     }
 }
