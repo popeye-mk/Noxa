@@ -1,0 +1,7 @@
+Safety and staying up to date:
+• NEW spyware alert: if any app tries to contact a known stalkerware
+  server, Noxa blocks it AND warns you, naming the app
+• NEW "a newer Noxa is available" notice, once a day, with a link to the
+  download page (Noxa never installs anything by itself)
+• Settings & tools → "Check for a new Noxa version"
+• Releases are now built and signed on GitHub, so updates ship faster

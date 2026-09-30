@@ -63,6 +63,7 @@ class MainActivity : Activity() {
         }
         ensureNotificationPermission()
         maybeShowIntro()
+        AppUpdater.autoCheck(this)
     }
 
     /** Android 13+ hides the foreground "protecting you" notification unless the

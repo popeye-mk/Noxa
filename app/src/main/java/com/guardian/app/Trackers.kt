@@ -157,7 +157,7 @@ object Trackers {
     }
 
     /** Just the company/name part (before the "·"), for compact summaries. */
-    fun companyOf(label: String): String = label.substringBefore(" · ").trim()
+    fun companyOf(label: String): String = label.substringBefore(" · ").trim()   // "Stalkerware · Spyware" -> "Stalkerware"
 
     private fun rootDomain(host: String): String {
         val parts = host.split('.')
