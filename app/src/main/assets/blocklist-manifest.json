@@ -1,24 +1,24 @@
 {
   "format": "GBF1",
-  "built_at": "2026-09-30 22:13:56",
+  "built_at": "2026-10-01 19:01:02",
   "false_positive_target": 1e-06,
-  "sha256": "6c1c257c34817da01b638cd9784969393a1cc511dc6d72b6f22c4fecb0975019",
+  "sha256": "542412037817f01e9fe31e398b0284d651ce18218d663fb27e57bb39888c058f",
   "stalkerware_sha256": "6c8f65f5db907dd75155aa5d4071b0da777d41ed396ceb4178885a7ad84af2c9",
+  "threats_sha256": "736185eb16dd2b4b6f32c42b6db9f2009a291709d8f8d8011efc3d56bc3b2e48",
+  "threats_domains": 306729,
   "stalkerware_domains": 525,
-  "threats_sha256": "38ae47ff609bfb387a2d9e90aa75b0ddf864763b8cb263cbfd202ba5271beb07",
-  "threats_domains": 262060,
   "bloom": {
-    "m_bits": 24815027,
+    "m_bits": 24767897,
     "k_hashes": 20,
-    "size_mb": 2.958,
-    "items": 862976
+    "size_mb": 2.953,
+    "items": 861337
   },
-  "unique_domains": 862976,
-  "raw_total": 1606099,
+  "unique_domains": 861337,
+  "raw_total": 1603058,
   "protection_categories": {
     "publicite": 4269,
-    "malware": 243251,
-    "phishing": 242703,
+    "malware": 242166,
+    "phishing": 242303,
     "cryptojacking": 11490,
     "stalkerware": 525,
     "marketingware": 77,
@@ -32,15 +32,15 @@
   },
   "extra_sources": {
     "stevenblack": 74761,
-    "easyprivacy": 47173,
-    "easylist": 49045,
-    "oisd": 245225,
-    "hagezi_pro": 230960,
-    "adguard_dns": 176230,
+    "easyprivacy": 47185,
+    "easylist": 49311,
+    "oisd": 244883,
+    "hagezi_pro": 231053,
+    "adguard_dns": 176508,
     "hagezi_doh": 3336,
-    "dandelion_am": 11734,
+    "dandelion_am": 11588,
     "nocoin": 312,
-    "phishing_army": 149396
+    "phishing_army": 147679
   },
   "curated_always_block": 4,
   "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); idx_i=(h1 + i*h2) mod m, i in 0..k-1"
