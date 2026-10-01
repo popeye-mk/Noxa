@@ -32,7 +32,7 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **IPv6-proof** — DNS is captured over IPv4 *and* IPv6, so lookups can't slip around the filter on modern networks.
 - **Works on Android TV** — appears in the TV launcher; block the trackers baked into every smart-TV app.
 - **Stays on** — battery-exemption ask, a self-restarting watchdog, and automatic start after reboot: protection that doesn't silently die.
-- **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi.
+- **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi. **You choose the resolver**: Cloudflare, Quad9, Mullvad, AdGuard, Google or your own.
 - **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
 - **Watch it live** — see every app's lookups as they happen; tap one to allow or block that site on the spot. Kept in memory only, never saved.
 - **Your own lists** — *Allowed sites* (never block) and *My blocked sites* (always block), editable any time.

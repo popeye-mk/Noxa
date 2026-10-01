@@ -92,9 +92,9 @@ class GuardianVpnService : VpnService() {
         // NXDOMAIN and they fall back to plain DNS, which Guardian can filter.
         private const val DOH_CANARY = "use-application-dns.net"
 
-        // Upstream resolver used for ALLOWED lookups (Cloudflare here; a
-        // mainstream resolver keeps us in a large anonymity set — see mission).
-        private val UPSTREAM_DNS = InetAddress.getByName("1.1.1.1")
+        // Upstream resolver for ALLOWED lookups: the user's choice (default
+        // Cloudflare — a mainstream resolver keeps us in a large anonymity set).
+        // Read live from DnsProviders.current, so a change applies at once.
         private const val WORKERS = 4
         private const val UPSTREAM_TIMEOUT_MS = 3000
 
@@ -201,6 +201,7 @@ class GuardianVpnService : VpnService() {
         if (running.get()) return
         filter = BloomFilter.loadCurrent(this)          // downloaded update, else bundled
         Stalkerware.load(this)
+        DnsProviders.load(this)
         FilterUpdater.autoCheck(this)                   // quiet once-a-day refresh
         AppUpdater.autoCheck(this)                      // "a newer Noxa is available"
 
@@ -388,13 +389,11 @@ class GuardianVpnService : VpnService() {
     }
 
     /** One resolver worker: its own protected upstream socket, so replies can
-     *  never be read by the wrong thread. */
+     *  never be read by the wrong thread. Unconnected, so a provider change
+     *  applies to the next lookup without restarting anything. */
     private fun workerLoop(tunOut: FileOutputStream) {
         val sock = try {
-            DatagramSocket().also {
-                protect(it)
-                it.connect(InetSocketAddress(UPSTREAM_DNS, 53))
-            }
+            DatagramSocket().also { protect(it) }
         } catch (e: Exception) { Log.w(TAG, "worker socket failed: $e"); return }
         try {
             // Interrupted = this worker belongs to a stopped session; exit even
@@ -445,11 +444,12 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    /** Plain UDP DNS. Only accepts a reply whose transaction ID matches this
-     *  query: a late answer to an earlier, timed-out query can still arrive on
-     *  the socket and must never be handed to the wrong lookup. */
+    /** Plain UDP DNS. Only accepts a reply from the resolver we asked, whose
+     *  transaction ID matches this query: a late answer to an earlier,
+     *  timed-out query can still arrive and must never reach the wrong lookup. */
     private fun resolvePlain(payload: ByteArray, sock: DatagramSocket): ByteArray? {
-        sock.send(java.net.DatagramPacket(payload, payload.size))
+        val upstream = DnsProviders.current.address
+        sock.send(java.net.DatagramPacket(payload, payload.size, upstream, 53))
         val deadline = System.currentTimeMillis() + UPSTREAM_TIMEOUT_MS
         val buf = ByteArray(4096)
         while (true) {
@@ -458,7 +458,8 @@ class GuardianVpnService : VpnService() {
             sock.soTimeout = left.toInt()
             val resp = java.net.DatagramPacket(buf, buf.size)
             try { sock.receive(resp) } catch (_: SocketTimeoutException) { return null }
-            if (resp.length >= 12 && buf[0] == payload[0] && buf[1] == payload[1])
+            if (resp.length >= 12 && buf[0] == payload[0] && buf[1] == payload[1] &&
+                resp.address == upstream)
                 return buf.copyOf(resp.length)
             // stale reply for an earlier query — discard and keep waiting
         }
@@ -493,12 +494,14 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    /** DNS-over-HTTPS to Cloudflare *by IP* (1.1.1.1) so no bootstrap DNS lookup
-     *  is needed. Guardian's own traffic is excluded from the VPN, so this can't
-     *  loop. Returns the raw DNS answer, or null on any failure (caller falls back). */
+    /** DNS-over-HTTPS to the chosen provider. Noxa's own traffic is excluded
+     *  from the VPN, so this can't loop (and a DoH hostname resolves via the
+     *  system resolver). Returns the raw DNS answer, or null on any failure
+     *  (caller falls back to plain DNS at the same provider). */
     private fun resolveDoh(query: ByteArray): ByteArray? {
+        val url = DnsProviders.current.doh ?: return null
         return try {
-            val conn = URL("https://1.1.1.1/dns-query").openConnection() as HttpsURLConnection
+            val conn = URL(url).openConnection() as HttpsURLConnection
             conn.requestMethod = "POST"
             conn.connectTimeout = UPSTREAM_TIMEOUT_MS
             conn.readTimeout = UPSTREAM_TIMEOUT_MS

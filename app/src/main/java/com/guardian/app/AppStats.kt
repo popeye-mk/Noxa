@@ -232,6 +232,7 @@ object AppStats {
         put("firewalled_apps", JSONArray(firewall.keys.sorted()))
         put("excluded_apps", JSONArray(noFilter.keys.sorted()))
         put("encrypted_dns", GuardianVpnService.encryptedDns.get())
+        put("dns_provider", DnsProviders.exportValue())
     }.toString(2)
 
     /** Merge a backup into the current settings (never deletes anything).
@@ -254,6 +255,7 @@ object AppStats {
         for (p in strings("firewalled_apps")) if (PKG_RE.matches(p) && firewall.put(p, true) == null) apps++
         for (p in strings("excluded_apps")) if (PKG_RE.matches(p) && noFilter.put(p, true) == null) apps++
         if (o.has("encrypted_dns")) GuardianVpnService.setEncryptedDns(ctx, o.optBoolean("encrypted_dns", true))
+        o.optString("dns_provider", "").takeIf { it.isNotEmpty() }?.let { DnsProviders.importValue(ctx, it) }
         save(ctx)
         return "Restored: $sites site(s), $apps app setting(s). " +
             "Turn protection off and on to apply app exclusions."
