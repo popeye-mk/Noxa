@@ -251,6 +251,7 @@ def read_adblock(path):
     '||tracker.com^' and skip exceptions (@@), cosmetic rules (##), and any
     rule with a path or wildcard — those can't be safely applied at DNS level."""
     out = []
+    cancelled = set()   # hosts whose rule this list itself cancels ($badfilter)
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
             s = line.strip()
@@ -258,6 +259,22 @@ def read_adblock(path):
                 continue
             if s.startswith("@@"):                 # exception rule — never block
                 continue
+            if s.startswith("||") and "$" in s:
+                opts = _options(s.split("$", 1)[1])
+                # '$badfilter' CANCELS the matching rule ("stop blocking this").
+                # Read naively it became a block: that is how ALL of
+                # amazonaws.com (every AWS service) and the whole pl.ua zone
+                # ended up blocked. Remember it, and drop the host below.
+                if "badfilter" in opts:
+                    host = s[2:].split("$", 1)[0].split("^", 1)[0]
+                    d = normalize(host) if "/" not in host and "*" not in host else None
+                    if d:
+                        cancelled.add(d)
+                    continue
+                # Rules that MODIFY a request (strip a parameter, set CSP,
+                # redirect to a stub, rewrite headers) don't block it at all.
+                if opts & _NON_BLOCKING_OPTIONS:
+                    continue
             if "##" in s or "#@#" in s or "#?#" in s:   # element hiding
                 continue
             if not s.startswith("||"):             # only domain-anchored rules
@@ -297,7 +314,20 @@ def read_adblock(path):
             d = normalize(body)
             if d:
                 out.append(d)
-    return out
+    # Honour this list's own cancellations, wherever they appear in the file.
+    return [d for d in out if d not in cancelled]
+
+
+_NON_BLOCKING_OPTIONS = frozenset((
+    "removeparam", "queryprune", "csp", "redirect", "redirect-rule", "rewrite",
+    "replace", "cookie", "removeheader", "header", "permissions", "urltransform",
+    "jsonprune", "referrerpolicy", "hls", "stealth", "empty", "mp4",
+))
+
+
+def _options(options: str) -> set:
+    """Adblock option names, lowercased, without values or '~'."""
+    return {o.strip().lstrip("~").split("=", 1)[0].lower() for o in options.split(",") if o.strip()}
 
 
 def _site_restricted(options: str) -> bool:
