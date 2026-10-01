@@ -49,7 +49,7 @@ jobs:
           cache-provider: basic
 
       - name: Unit tests
-        run: ./gradlew --no-daemon testReleaseUnitTest
+        run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Write signing config (never printed, deleted after)
         env:
