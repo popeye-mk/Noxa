@@ -138,6 +138,20 @@ class GuardianVpnService : VpnService() {
                 .edit().putLong(KEY_PAUSED_UNTIL, t).apply()
         }
 
+        // v1.8 self-heal, with a BACKOFF so it can never become a battery fire:
+        // 3 s, 10 s, 30 s, 2 min, then hand over to the 15-min watchdog. The
+        // counter resets once the tunnel has stayed up for 5 minutes.
+        private val HEAL_DELAYS_MS = longArrayOf(3_000L, 10_000L, 30_000L, 120_000L)
+        private val healAttempts = AtomicInteger(0)
+        @Volatile private var tunUpAt = 0L
+
+        /** Delay for the next self-heal, or null = stop trying (watchdog takes over). */
+        fun nextHealDelay(now: Long = System.currentTimeMillis()): Long? {
+            if (tunUpAt != 0L && now - tunUpAt > 5L * 60 * 1000) healAttempts.set(0)   // it was stable: fresh start
+            val n = healAttempts.getAndIncrement()
+            return HEAL_DELAYS_MS.getOrNull(n)
+        }
+
         // Set by FilterUpdater after it installs a newer list; the running
         // service picks it up on its next lookup and swaps the filter live.
         private val filterReload = AtomicBoolean(false)
@@ -270,6 +284,7 @@ class GuardianVpnService : VpnService() {
             return
         }
         tunnel = fd
+        tunUpAt = System.currentTimeMillis()
         running.set(true)
         isRunning.set(true)
         NoxaWidget.refreshAll(this)
@@ -381,8 +396,13 @@ class GuardianVpnService : VpnService() {
         if (running.get()) {
             stopVpn()
             if (wantsProtection(this) && !isPaused(this) && !TunnelController.isUp) {
-                Log.w(TAG, "tunnel died unexpectedly — self-heal in 3 s")
-                WatchdogReceiver.scheduleResume(this, 3000)
+                val delay = nextHealDelay()
+                if (delay != null) {
+                    Log.w(TAG, "tunnel died unexpectedly — self-heal in ${delay / 1000} s")
+                    WatchdogReceiver.scheduleResume(this, delay, wakeup = false)   // no CPU wake-up for this
+                } else {
+                    Log.w(TAG, "tunnel keeps dying — leaving it to the 15-min watchdog")
+                }
             }
         }
     }
