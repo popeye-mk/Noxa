@@ -12,6 +12,9 @@ local.properties
 keystore.properties
 *.jks
 *.keystore
+# ...except the PUBLIC key for "Noxa TEST" builds (password "android"),
+# deliberately committed so test builds always install over each other.
+!app/debug.keystore
 
 # --- One-shot builder's downloaded toolchain (lives in ~/.guardian-build) ---
 # (outside the repo; listed for clarity)

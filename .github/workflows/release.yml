@@ -12,6 +12,14 @@ name: Publish signed release
 on:
   release:
     types: [published]
+  # Rebuild an EXISTING release (e.g. after fixing this workflow on main)
+  # without deleting the release or its tag: Actions → this workflow →
+  # Run workflow → enter the tag. Builds the code of that tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to (re)build and attach, e.g. v1.9"
+        required: true
 
 permissions:
   contents: read
@@ -23,6 +31,8 @@ jobs:
       contents: write   # to attach the APK to the release
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Check signing secrets are set
         env:
@@ -80,7 +90,7 @@ jobs:
 
       - name: Attach APK to the release
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk "noxa-${TAG}.apk"

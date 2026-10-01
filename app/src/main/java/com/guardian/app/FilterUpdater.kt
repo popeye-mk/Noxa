@@ -26,6 +26,7 @@ object FilterUpdater {
     private const val MANIFEST_URL = "$BASE/blocklist-manifest.json"
     private const val FILTER_URL = "$BASE/guardian-default.gbf"
     private const val STALKERWARE_URL = "$BASE/${Stalkerware.FILE}"
+    private const val THREATS_URL = "$BASE/${Threats.FILE}"
 
     private const val PREFS = "guardian_filter"
     private const val KEY_BUILT_AT = "filter_built_at"
@@ -80,10 +81,22 @@ object FilterUpdater {
             val spyOk = spy != null && sha256Hex(spy).equals(spyExpected, ignoreCase = true) &&
                 Stalkerware.parse(String(spy, Charsets.UTF_8)).size > 100
 
+            // Dangerous-site filter: same rules (optional, verified, else kept).
+            val thrExpected = json.optString("threats_sha256", "")
+            val thr = if (thrExpected.isEmpty()) null else httpGet(THREATS_URL)
+            val thrOk = thr != null && BloomFilter.isValidFile(thr) &&
+                sha256Hex(thr).equals(thrExpected, ignoreCase = true)
+
             val tmp = File(ctx.filesDir, "$FILTER_FILE.tmp")
             tmp.writeBytes(gbf)
             val dst = File(ctx.filesDir, FILTER_FILE)
             if (!tmp.renameTo(dst)) { tmp.copyTo(dst, overwrite = true); tmp.delete() }
+            if (thrOk) {
+                val ttmp = File(ctx.filesDir, "${Threats.FILE}.tmp")
+                ttmp.writeBytes(thr!!)
+                val tdst = File(ctx.filesDir, Threats.FILE)
+                if (!ttmp.renameTo(tdst)) { ttmp.copyTo(tdst, overwrite = true); ttmp.delete() }
+            }
             if (spyOk) {
                 val stmp = File(ctx.filesDir, "${Stalkerware.FILE}.tmp")
                 stmp.writeBytes(spy!!)

@@ -131,6 +131,13 @@ ALLOWLIST_DOMAINS = [
     "brave-core-ext.s3.brave.com",
 ]
 
+# DANGEROUS-SITE set (v1.8): a second, smaller Bloom filter of the phishing /
+# scam / malware part of the list. Every domain in it is ALSO in the main
+# filter (so it's blocked either way); the app uses this one only to tell the
+# user WHY — "that link is a known scam site" — instead of a silent failure.
+THREAT_CATEGORIES = ["phishing", "malware", "cryptojacking", "ddos", "hacking", "dialer"]
+THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin"]
+
 # Curated tracking-only endpoints that are ALWAYS blocked, whatever the
 # upstream lists contain this week. Keep this tiny and tracking-only: never an
 # app's core domain (verify_build.py's MUST_ALLOW enforces that). Added AFTER
@@ -150,6 +157,9 @@ FALSE_POSITIVE_RATE = 1e-6      # ~1 in a million: very safe for a blocker
 MAGIC = b"GBF1"                 # Guardian Bloom Filter, format v1
 
 
+_HOST_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-_")
+
+
 def normalize(line: str):
     """Lowercase, trim, drop comments/blanks, keep only plausible domains."""
     s = line.strip().lower()
@@ -161,7 +171,13 @@ def normalize(line: str):
         if s.startswith(pfx):
             s = s[len(pfx):]
     s = s.split("/")[0].split(":")[0].strip()
-    if "." not in s or " " in s:
+    # Canonical form only: no leading/trailing dots, no "*." wildcard prefix,
+    # hostname characters only. The phone compares exact lowercase names with
+    # no trailing dot (DnsPacket.parseQuery), so anything else is dead weight.
+    s = s.strip(".")
+    if s.startswith("*."):
+        s = s[2:]
+    if "." not in s or ".." in s or not all(c in _HOST_CHARS for c in s):
         return None
     # An IP address is not a domain: the app only ever checks looked-up NAMES,
     # so an IP entry (e.g. EasyPrivacy's 127.0.0.1) only wastes filter space.
@@ -421,6 +437,24 @@ def main():
     with open(os.path.join(OUT, "guardian-default.gbf"), "rb") as f:
         gbf_sha256 = hashlib.sha256(f.read()).hexdigest()
 
+    # Dangerous-site filter (see THREAT_CATEGORIES). Built from the same parsed
+    # sources, restricted to what survived the allowlist (so it can never flag
+    # a domain the main filter doesn't block).
+    threats = set()
+    for cat in THREAT_CATEGORIES:
+        threats.update(read_category(cat))
+    for name in THREAT_EXTRA_SOURCES:
+        threats.update(read_extra_source(name))
+    threats &= all_domains
+    threats = sorted(threats)
+    t_m, t_k = bloom_params(len(threats), FALSE_POSITIVE_RATE)
+    write_gbf(os.path.join(OUT, "threats.gbf"), t_m, t_k, len(threats), build_bloom(threats, t_m, t_k))
+    with open(os.path.join(OUT, "threats.gbf"), "rb") as f:
+        threats_sha256 = hashlib.sha256(f.read()).hexdigest()
+    with open(os.path.join(OUT, "threat-domains.txt"), "w") as f:
+        f.write("\n".join(threats))
+    print("Dangerous-site filter: %d domains, %.2f MB" % (len(threats), ((t_m + 7) // 8) / (1024 * 1024)))
+
     # Stalkerware list: a plain copy of UT1's category, shipped to the app so it
     # can WARN about spyware (the main filter already blocks these domains).
     stalk = sorted(set(read_category("stalkerware")))
@@ -440,6 +474,8 @@ def main():
         "false_positive_target": FALSE_POSITIVE_RATE,
         "sha256": gbf_sha256,   # app verifies downloads against this
         "stalkerware_sha256": stalk_sha256,
+        "threats_sha256": threats_sha256,
+        "threats_domains": len(threats),
         "stalkerware_domains": len(stalk),
         "bloom": {"m_bits": m_bits, "k_hashes": k,
                   "size_mb": round(size_mb, 3), "items": n},

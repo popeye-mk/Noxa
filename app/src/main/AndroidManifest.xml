@@ -71,6 +71,11 @@
             android:name=".AllowlistActivity"
             android:exported="false" />
 
+        <!-- v1.8 protection check-up: what's protecting you, one-tap fixes. -->
+        <activity
+            android:name=".CheckupActivity"
+            android:exported="false" />
+
         <!-- v1.5 live feed: watch lookups happen, fix a block in one tap. -->
         <activity
             android:name=".LiveActivity"

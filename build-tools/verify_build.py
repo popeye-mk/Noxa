@@ -120,6 +120,38 @@ if bad_allow:
 not_blocked = [d for d in MUST_BLOCK if not blocked(d)]
 check("known trackers blocked", not not_blocked, ", ".join(not_blocked))
 
+# Dangerous-site filter: same format checks, every entry blocked by the main
+# filter, and its own false-positive sanity (a FP here = a wrong "scam" label).
+t_raw = open(os.path.join(OUT, "threats.gbf"), "rb").read()
+t_k = struct.unpack("<I", t_raw[4:8])[0]; t_m = struct.unpack("<Q", t_raw[8:16])[0]
+t_n = struct.unpack("<Q", t_raw[16:24])[0]; t_ba = t_raw[24:]
+check("threats.gbf format", t_raw[:4] == b"GBF1" and len(t_ba) == (t_m + 7) // 8 and 1 <= t_k <= 64)
+check("threats sha256 matches manifest", hashlib.sha256(t_raw).hexdigest() == manifest.get("threats_sha256"))
+t_domains = [l.strip() for l in open(os.path.join(OUT, "threat-domains.txt")) if l.strip()]
+check("threats count matches header/manifest", len(t_domains) == t_n == manifest.get("threats_domains"), f"{len(t_domains)} / {t_n}")
+check("threats list sane (50k..2M)", 50_000 <= t_n <= 2_000_000, f"{t_n:,}")
+
+def t_contains(d):
+    h = hashlib.sha256(d.encode()).digest()
+    h1 = int.from_bytes(h[0:8], "little"); h2 = int.from_bytes(h[8:16], "little")
+    for i in range(t_k):
+        idx = (h1 + i * h2) % t_m
+        if not (t_ba[idx >> 3] >> (idx & 7)) & 1:
+            return False
+    return True
+t_sample = t_domains if len(t_domains) <= 20000 else random.Random(3).sample(t_domains, 20000)
+check("threats: no false negatives (sample)", all(t_contains(d) for d in t_sample))
+t_unblocked = [d for d in t_sample if not blocked(d)]
+check("threats: every entry also blocked by the main filter", not t_unblocked,
+      f"{len(t_unblocked)} not blocked, e.g. {t_unblocked[:8]!r}")
+t_rng = random.Random(11); t_fp = 0
+for _ in range(300_000):
+    d = "".join(t_rng.choices(string.ascii_lowercase, k=14)) + ".com"
+    if d not in dset and t_contains(d):
+        t_fp += 1
+check("threats: false-positive rate <= 2e-5 (300k names)", t_fp <= 6, f"{t_fp}/300000")
+check("threats: everyday sites not flagged", not any(t_contains(d) for d in MUST_ALLOW))
+
 stalk_path = os.path.join(OUT, "stalkerware.txt")
 stalk = [l.strip() for l in open(stalk_path)] if os.path.isfile(stalk_path) else []
 stalk = [d for d in stalk if d]
