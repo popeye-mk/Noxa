@@ -109,3 +109,15 @@ class ThreatsTest {
         assertEquals(-1, CheckupActivity.filterAgeDays("", now))
     }
 }
+
+class SelfHealTest {
+    @Test fun backsOffThenStops() {
+        val now = 1_700_000_000_000L
+        assertEquals(3_000L, GuardianVpnService.nextHealDelay(now))
+        assertEquals(10_000L, GuardianVpnService.nextHealDelay(now + 1))
+        assertEquals(30_000L, GuardianVpnService.nextHealDelay(now + 2))
+        assertEquals(120_000L, GuardianVpnService.nextHealDelay(now + 3))
+        assertEquals(null, GuardianVpnService.nextHealDelay(now + 4))     // hands over to the watchdog
+        assertEquals(null, GuardianVpnService.nextHealDelay(now + 5))     // and stays handed over
+    }
+}
