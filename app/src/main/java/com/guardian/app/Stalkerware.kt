@@ -74,8 +74,8 @@ object Stalkerware {
     /** Show the warning, at most once per app per day. */
     fun alert(ctx: Context, pkg: String, domain: String) {
         val now = System.currentTimeMillis()
-        val last = lastAlert[pkg] ?: 0L
-        if (now - last < ALERT_COOLDOWN_MS) return
+        val last = lastAlert[pkg]                        // null = never alerted
+        if (last != null && now - last < ALERT_COOLDOWN_MS) return
         lastAlert[pkg] = now
         try {
             val mgr = ctx.getSystemService(NotificationManager::class.java)
@@ -86,7 +86,13 @@ object Stalkerware {
             }
             val app = appName(ctx, pkg)
             val isBrowser = looksLikeBrowser(ctx, pkg)
-            val body = if (isBrowser)
+            val unknown = pkg == AppStats.UNKNOWN
+            val body = if (unknown)
+                "Something on this phone reached $domain, which is on the stalkerware " +
+                "(spyware) list — Noxa blocked it but couldn't tell which app asked. " +
+                "If you were just browsing, that's probably it. If not, open " +
+                "\"Watch it live\" and see which app repeats it."
+            else if (isBrowser)
                 "$app reached $domain, which is on the stalkerware (spyware) list. " +
                 "For a browser this usually just means a page you visited — nothing to do " +
                 "unless you didn't expect it. Noxa blocked the connection."
@@ -98,7 +104,7 @@ object Stalkerware {
             val open = PendingIntent.getActivity(ctx, NOTIF_BASE, Intent(ctx, AppsActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE)
             val n = Notification.Builder(ctx, CHANNEL_ID)
-                .setContentTitle(if (isBrowser) "Spyware site reached (blocked)" else "⚠ Possible spyware on this phone")
+                .setContentTitle(if (isBrowser || unknown) "Spyware server reached (blocked)" else "⚠ Possible spyware on this phone")
                 .setContentText(body)
                 .setStyle(Notification.BigTextStyle().bigText(body))
                 .setSmallIcon(android.R.drawable.stat_sys_warning)

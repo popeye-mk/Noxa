@@ -86,15 +86,19 @@ class GuardianVpnService : VpnService() {
         const val KEY_BLOCKED = "blocked"
         const val KEY_ALLOWED = "allowed"
         const val KEY_PERIOD_START = "period_start"
+        // Recorded on each start for the check-up screen (only a running
+        // VpnService can ask Android these).
+        const val KEY_ALWAYS_ON = "always_on"
+        const val KEY_LOCKDOWN = "lockdown"
         private const val RESET_MS = 30L * 24 * 60 * 60 * 1000   // roll the stats every 30 days
 
         // Canary domain: browsers query it before enabling DNS-over-HTTPS. Answer
         // NXDOMAIN and they fall back to plain DNS, which Guardian can filter.
         private const val DOH_CANARY = "use-application-dns.net"
 
-        // Upstream resolver used for ALLOWED lookups (Cloudflare here; a
-        // mainstream resolver keeps us in a large anonymity set — see mission).
-        private val UPSTREAM_DNS = InetAddress.getByName("1.1.1.1")
+        // Upstream resolver for ALLOWED lookups: the user's choice (default
+        // Cloudflare — a mainstream resolver keeps us in a large anonymity set).
+        // Read live from DnsProviders.current, so a change applies at once.
         private const val WORKERS = 4
         private const val UPSTREAM_TIMEOUT_MS = 3000
 
@@ -132,6 +136,20 @@ class GuardianVpnService : VpnService() {
         private fun setPausedUntil(ctx: Context, t: Long) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putLong(KEY_PAUSED_UNTIL, t).apply()
+        }
+
+        // v1.8 self-heal, with a BACKOFF so it can never become a battery fire:
+        // 3 s, 10 s, 30 s, 2 min, then hand over to the 15-min watchdog. The
+        // counter resets once the tunnel has stayed up for 5 minutes.
+        private val HEAL_DELAYS_MS = longArrayOf(3_000L, 10_000L, 30_000L, 120_000L)
+        private val healAttempts = AtomicInteger(0)
+        @Volatile private var tunUpAt = 0L
+
+        /** Delay for the next self-heal, or null = stop trying (watchdog takes over). */
+        fun nextHealDelay(now: Long = System.currentTimeMillis()): Long? {
+            if (tunUpAt != 0L && now - tunUpAt > 5L * 60 * 1000) healAttempts.set(0)   // it was stable: fresh start
+            val n = healAttempts.getAndIncrement()
+            return HEAL_DELAYS_MS.getOrNull(n)
         }
 
         // Set by FilterUpdater after it installs a newer list; the running
@@ -201,6 +219,14 @@ class GuardianVpnService : VpnService() {
         if (running.get()) return
         filter = BloomFilter.loadCurrent(this)          // downloaded update, else bundled
         Stalkerware.load(this)
+        Threats.load(this)
+        DnsProviders.load(this)
+        if (Build.VERSION.SDK_INT >= 29) {
+            try {
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(KEY_ALWAYS_ON, isAlwaysOn()).putBoolean(KEY_LOCKDOWN, isLockdownEnabled()).apply()
+            } catch (_: Exception) {}
+        }
         FilterUpdater.autoCheck(this)                   // quiet once-a-day refresh
         AppUpdater.autoCheck(this)                      // "a newer Noxa is available"
 
@@ -258,6 +284,7 @@ class GuardianVpnService : VpnService() {
             return
         }
         tunnel = fd
+        tunUpAt = System.currentTimeMillis()
         running.set(true)
         isRunning.set(true)
         NoxaWidget.refreshAll(this)
@@ -328,10 +355,16 @@ class GuardianVpnService : VpnService() {
                         // BLOCKED: sinkhole (0.0.0.0) + record WHO the tracker is (Phase 3).
                         onBlocked()
                         val spy = Stalkerware.matches(query.domain)
-                        val label = if (spy) Stalkerware.LABEL else Trackers.label(query.domain)
+                        val danger = !spy && Threats.matches(query.domain)
+                        val label = when {
+                            spy -> Stalkerware.LABEL
+                            danger -> Threats.LABEL
+                            else -> Trackers.label(query.domain)
+                        }
                         AppStats.recordBlocked(pkg, label)
-                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, if (spy) "⚠ $label" else label)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, if (spy || danger) "⚠ $label" else label)
                         if (spy) Stalkerware.alert(this, pkg, query.domain)
+                        if (danger) Threats.alert(this, pkg, query.domain)
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
@@ -357,8 +390,21 @@ class GuardianVpnService : VpnService() {
         }
         // If we fell out of the loop while still "running", the tunnel died
         // (e.g. network change / EOF). Shut down cleanly instead of leaving a
-        // hot, half-dead service — the user can flip the switch to restart.
-        if (running.get()) stopVpn()
+        // hot, half-dead service — and (v1.8) come straight back: the user
+        // still wants protection, so retry in a few seconds rather than
+        // waiting up to 15 min for the watchdog.
+        if (running.get()) {
+            stopVpn()
+            if (wantsProtection(this) && !isPaused(this) && !TunnelController.isUp) {
+                val delay = nextHealDelay()
+                if (delay != null) {
+                    Log.w(TAG, "tunnel died unexpectedly — self-heal in ${delay / 1000} s")
+                    WatchdogReceiver.scheduleResume(this, delay, wakeup = false)   // no CPU wake-up for this
+                } else {
+                    Log.w(TAG, "tunnel keeps dying — leaving it to the 15-min watchdog")
+                }
+            }
+        }
     }
 
     /** Every block, from any path: the live counter + the per-day history. */
@@ -388,13 +434,11 @@ class GuardianVpnService : VpnService() {
     }
 
     /** One resolver worker: its own protected upstream socket, so replies can
-     *  never be read by the wrong thread. */
+     *  never be read by the wrong thread. Unconnected, so a provider change
+     *  applies to the next lookup without restarting anything. */
     private fun workerLoop(tunOut: FileOutputStream) {
         val sock = try {
-            DatagramSocket().also {
-                protect(it)
-                it.connect(InetSocketAddress(UPSTREAM_DNS, 53))
-            }
+            DatagramSocket().also { protect(it) }
         } catch (e: Exception) { Log.w(TAG, "worker socket failed: $e"); return }
         try {
             // Interrupted = this worker belongs to a stopped session; exit even
@@ -445,11 +489,12 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    /** Plain UDP DNS. Only accepts a reply whose transaction ID matches this
-     *  query: a late answer to an earlier, timed-out query can still arrive on
-     *  the socket and must never be handed to the wrong lookup. */
+    /** Plain UDP DNS. Only accepts a reply from the resolver we asked, whose
+     *  transaction ID matches this query: a late answer to an earlier,
+     *  timed-out query can still arrive and must never reach the wrong lookup. */
     private fun resolvePlain(payload: ByteArray, sock: DatagramSocket): ByteArray? {
-        sock.send(java.net.DatagramPacket(payload, payload.size))
+        val upstream = DnsProviders.current.address
+        sock.send(java.net.DatagramPacket(payload, payload.size, upstream, 53))
         val deadline = System.currentTimeMillis() + UPSTREAM_TIMEOUT_MS
         val buf = ByteArray(4096)
         while (true) {
@@ -458,7 +503,8 @@ class GuardianVpnService : VpnService() {
             sock.soTimeout = left.toInt()
             val resp = java.net.DatagramPacket(buf, buf.size)
             try { sock.receive(resp) } catch (_: SocketTimeoutException) { return null }
-            if (resp.length >= 12 && buf[0] == payload[0] && buf[1] == payload[1])
+            if (resp.length >= 12 && buf[0] == payload[0] && buf[1] == payload[1] &&
+                resp.address == upstream)
                 return buf.copyOf(resp.length)
             // stale reply for an earlier query — discard and keep waiting
         }
@@ -493,12 +539,14 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    /** DNS-over-HTTPS to Cloudflare *by IP* (1.1.1.1) so no bootstrap DNS lookup
-     *  is needed. Guardian's own traffic is excluded from the VPN, so this can't
-     *  loop. Returns the raw DNS answer, or null on any failure (caller falls back). */
+    /** DNS-over-HTTPS to the chosen provider. Noxa's own traffic is excluded
+     *  from the VPN, so this can't loop (and a DoH hostname resolves via the
+     *  system resolver). Returns the raw DNS answer, or null on any failure
+     *  (caller falls back to plain DNS at the same provider). */
     private fun resolveDoh(query: ByteArray): ByteArray? {
+        val url = DnsProviders.current.doh ?: return null
         return try {
-            val conn = URL("https://1.1.1.1/dns-query").openConnection() as HttpsURLConnection
+            val conn = URL(url).openConnection() as HttpsURLConnection
             conn.requestMethod = "POST"
             conn.connectTimeout = UPSTREAM_TIMEOUT_MS
             conn.readTimeout = UPSTREAM_TIMEOUT_MS
@@ -513,14 +561,23 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    /** Best-effort: which app's package made this DNS query (needs API 29+, IPv4).
+    /** Best-effort: which app's package made this DNS query (needs API 29+).
+     *  IPv4 and IPv6 — modern phones send most DNS over IPv6, so v1.8 handles
+     *  both (before, every IPv6 lookup was filed under "system / unknown").
      *  Returns AppStats.UNKNOWN when it can't be attributed. */
     private fun ownerOf(buffer: ByteArray, q: DnsPacket.Query): String {
         val cm = connectivity
-        if (cm == null || Build.VERSION.SDK_INT < 29 || q.ipVersion != 4) return AppStats.UNKNOWN
+        if (cm == null || Build.VERSION.SDK_INT < 29) return AppStats.UNKNOWN
         return try {
-            val src = InetAddress.getByAddress(buffer.copyOfRange(12, 16))
-            val dst = InetAddress.getByAddress(buffer.copyOfRange(16, 20))
+            val src: InetAddress
+            val dst: InetAddress
+            if (q.ipVersion == 6) {
+                src = InetAddress.getByAddress(buffer.copyOfRange(8, 24))
+                dst = InetAddress.getByAddress(buffer.copyOfRange(24, 40))
+            } else {
+                src = InetAddress.getByAddress(buffer.copyOfRange(12, 16))
+                dst = InetAddress.getByAddress(buffer.copyOfRange(16, 20))
+            }
             val sport = ((buffer[q.udpStart].toInt() and 0xFF) shl 8) or
                 (buffer[q.udpStart + 1].toInt() and 0xFF)
             val uid = cm.getConnectionOwnerUid(
@@ -546,6 +603,7 @@ class GuardianVpnService : VpnService() {
                 val f = BloomFilter.loadCurrent(this)
                 filter = f
                 Stalkerware.load(this)
+                Threats.load(this)
                 Log.i(TAG, "filter reloaded live; items=${f.items}")
             } catch (e: Exception) { Log.w(TAG, "filter reload failed, keeping current: $e") }
         }, "guardian-filter-reload").start()

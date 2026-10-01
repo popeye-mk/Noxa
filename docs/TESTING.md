@@ -50,6 +50,21 @@ VPN can run at a time: turn the other one OFF first.
 | 4.4 | Add a site to Allowed sites, then "Restore settings from a backup" | Toast "Restored: …"; the earlier lists are back (merge, nothing deleted) |
 | 4.5 | "Fix an app that won't work" → exclude an app → OFF/ON | That app bypasses Noxa (its lookups no longer appear in Live) |
 
+## 4b. v1.8 additions (5 min)
+
+| # | Do | Pass when |
+|---|----|-----------|
+| 4b.1 | Settings & tools → "DNS provider" → pick Quad9 | Toast "Using Quad9"; sites keep loading; Live feed keeps flowing (no off/on needed) |
+| 4b.2 | Pick "Your own server…" → enter `9.9.9.9`, leave URL empty → Use it | Toast "Using 9.9.9.9"; sites load |
+| 4b.3 | Enter an invalid IP (e.g. `999.1.1.1`) | Toast says nothing changed |
+| 4b.4 | Back to Cloudflare | Toast confirms |
+| 4b.5 | In Chrome open `https://flexispy.com` | Red "⚠ Stalkerware · Spyware" line in Live; once per day a "Spyware site reached (blocked)" notification naming the browser |
+| 4b.6 | Settings & tools → "Check for a new Noxa version" | "You have the latest version (…)" |
+| 4b.7 | Per-app details | Apps named properly; little or nothing under "system / unknown" |
+| 4b.8 | Settings & tools → "Protection check-up" | Each row green or amber; tap a Fix button → the right system screen opens; come back → row turns green |
+| 4b.9 | In Chrome open a known phishing test site, e.g. `http://testsafebrowsing.appspot.com/s/phishing.html` or any domain from `build-tools/out/threat-domains.txt` | "Dangerous site blocked" notification; red "⚠ Dangerous site" line in Live |
+| 4b.10 | Toggle Wi-Fi off/on while protected | Protection comes back within seconds by itself (no 15-min gap); status stays green |
+
 ## 5. Survival (overnight)
 
 | # | Do | Pass when |

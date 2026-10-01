@@ -61,6 +61,24 @@ ignores pre-releases, so only you see it.
 
 If the job fails with "Signing secrets missing", do the one-time setup.
 
+**Rules learned from the first signed release (v1.8, 2026-10-01):**
+
+1. A new or changed workflow is not trusted until it has run end-to-end
+   once. Test it with a pre-release (tick "Set as a pre-release") before
+   relying on it for a real release.
+2. The unit-test step in `release.yml` stays identical to `build.yml`
+   (`testDebugUnitTest`). If one changes, change both.
+3. If a release run fails: fix the workflow on `main`, then **Actions →
+   "Publish signed release" → Run workflow → enter the tag**. That rebuilds
+   the same tag with the fixed workflow and replaces the attached APK.
+   Plain "Re-run jobs" would use the OLD workflow file from the tag's
+   commit, and deleting/recreating the tag is no longer needed.
+4. Never attach the CI "Build APK" artifact to a release: it is
+   **Noxa TEST** (`.test` package, test key) and won't update the real app.
+5. `versionCode` must go up by one for every release, and the matching
+   `fastlane/.../changelogs/<versionCode>.txt` must exist on `main`
+   before the release is created.
+
 ## Every release — manually on a PC (the old way, still works)
 
 1. Bump `versionCode` (+1, always) and `versionName` in

@@ -5,6 +5,8 @@
   "sha256": "6c1c257c34817da01b638cd9784969393a1cc511dc6d72b6f22c4fecb0975019",
   "stalkerware_sha256": "6c8f65f5db907dd75155aa5d4071b0da777d41ed396ceb4178885a7ad84af2c9",
   "stalkerware_domains": 525,
+  "threats_sha256": "38ae47ff609bfb387a2d9e90aa75b0ddf864763b8cb263cbfd202ba5271beb07",
+  "threats_domains": 262060,
   "bloom": {
     "m_bits": 24815027,
     "k_hashes": 20,

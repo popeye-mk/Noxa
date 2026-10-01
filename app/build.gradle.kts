@@ -23,11 +23,22 @@ android {
         applicationId = "com.guardian.app"
         minSdk = 24            // Android 7.0 — covers ~99% of devices
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.8"
+        versionCode = 16
+        versionName = "1.9"
     }
 
     signingConfigs {
+        // TEST builds: a fixed, public key checked into the repo (password
+        // "android", like Android's own default debug key) so every test APK —
+        // from CI or any PC — installs OVER the previous one instead of
+        // "package conflicts". It signs only "Noxa TEST"; real releases use
+        // the private key below.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "noxadebug"
+            keyPassword = "android"
+        }
         if (keystoreProps.isNotEmpty()) {
             create("release") {
                 storeFile = rootProject.file(keystoreProps["storeFile"] as String)
@@ -44,6 +55,7 @@ android {
         debug {
             applicationIdSuffix = ".test"
             versionNameSuffix = "-test"
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             // No minification: keeps the build reproducible/auditable — anyone
@@ -69,7 +81,7 @@ android {
     }
     // The compiled Bloom filter ships as an asset; don't compress it.
     androidResources {
-        noCompress += "gbf"
+        noCompress += "gbf"   // guardian-default.gbf + threats.gbf
     }
 }
 
