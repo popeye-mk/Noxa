@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var counter: TextView
     private lateinit var week: WeekChartView
+    private lateinit var checkup: TextView
     private val ui = Handler(Looper.getMainLooper())
 
     // The main switch means "am I protected?" — ON if EITHER the blocker or the
@@ -49,6 +50,8 @@ class MainActivity : Activity() {
         status = findViewById(R.id.status)
         counter = findViewById(R.id.counter)
         week = findViewById(R.id.week)
+        checkup = findViewById(R.id.checkup)
+        checkup.setOnClickListener { startActivity(Intent(this, CheckupActivity::class.java)) }
         DailyStats.load(this)
 
         toggle.setOnCheckedChangeListener(toggleListener)
@@ -116,6 +119,7 @@ class MainActivity : Activity() {
         toggle.setOnCheckedChangeListener(null)       // don't fire the listener while syncing
         toggle.isChecked = protectedNow
         toggle.setOnCheckedChangeListener(toggleListener)
+        updateCheckupHint(protectedNow)
         // The switch stays ON in tunnel mode (you ARE protected) — it must never
         // slide to "off" and look like protection died just because the blocker
         // handed the single VPN slot to the tunnel.
@@ -139,6 +143,17 @@ class MainActivity : Activity() {
                 status.setTextColor(android.graphics.Color.parseColor("#8FA0BC"))
             }
         }
+    }
+
+    /** v1.8: a quiet one-line nudge when something weakens protection. */
+    private fun updateCheckupHint(protectedNow: Boolean) {
+        val pm = getSystemService(android.os.PowerManager::class.java)
+        val issues = ArrayList<String>()
+        if (protectedNow && !pm.isIgnoringBatteryOptimizations(packageName)) issues += "battery"
+        if (!getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()) issues += "alerts"
+        if (!GuardianVpnService.encryptedDns.get()) issues += "encryption"
+        checkup.visibility = if (issues.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+        checkup.text = "🛡 ${issues.size} thing(s) could make protection stronger — tap to check"
     }
 
     private fun requestStart() {
