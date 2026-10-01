@@ -157,6 +157,9 @@ FALSE_POSITIVE_RATE = 1e-6      # ~1 in a million: very safe for a blocker
 MAGIC = b"GBF1"                 # Guardian Bloom Filter, format v1
 
 
+_HOST_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-_")
+
+
 def normalize(line: str):
     """Lowercase, trim, drop comments/blanks, keep only plausible domains."""
     s = line.strip().lower()
@@ -168,7 +171,13 @@ def normalize(line: str):
         if s.startswith(pfx):
             s = s[len(pfx):]
     s = s.split("/")[0].split(":")[0].strip()
-    if "." not in s or " " in s:
+    # Canonical form only: no leading/trailing dots, no "*." wildcard prefix,
+    # hostname characters only. The phone compares exact lowercase names with
+    # no trailing dot (DnsPacket.parseQuery), so anything else is dead weight.
+    s = s.strip(".")
+    if s.startswith("*."):
+        s = s[2:]
+    if "." not in s or ".." in s or not all(c in _HOST_CHARS for c in s):
         return None
     # An IP address is not a domain: the app only ever checks looked-up NAMES,
     # so an IP entry (e.g. EasyPrivacy's 127.0.0.1) only wastes filter space.

@@ -141,7 +141,9 @@ def t_contains(d):
     return True
 t_sample = t_domains if len(t_domains) <= 20000 else random.Random(3).sample(t_domains, 20000)
 check("threats: no false negatives (sample)", all(t_contains(d) for d in t_sample))
-check("threats: every entry also blocked by the main filter", all(blocked(d) for d in t_sample))
+t_unblocked = [d for d in t_sample if not blocked(d)]
+check("threats: every entry also blocked by the main filter", not t_unblocked,
+      f"{len(t_unblocked)} not blocked, e.g. {t_unblocked[:8]!r}")
 t_rng = random.Random(11); t_fp = 0
 for _ in range(300_000):
     d = "".join(t_rng.choices(string.ascii_lowercase, k=14)) + ".com"
