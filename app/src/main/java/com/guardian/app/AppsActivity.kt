@@ -213,7 +213,8 @@ class AppsActivity : Activity() {
             "📄  Save my report",
             "💾  Back up my settings",
             "📂  Restore settings from a backup",
-            "⬆️  Check for a new Noxa version"
+            "⬆️  Check for a new Noxa version",
+            "🌍  DNS provider (who answers lookups)"
         )
         AlertDialog.Builder(this)
             .setTitle("Settings & tools")
@@ -231,6 +232,7 @@ class AppsActivity : Activity() {
                     8 -> pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
                     9 -> pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
                     10 -> checkAppUpdate()
+                    11 -> showDnsProviderPicker()
                 }
             }
             .setNegativeButton("Close", null)
@@ -290,6 +292,52 @@ class AppsActivity : Activity() {
             out.write(buf, 0, n)
             if (out.size() > max) return null
         }
+    }
+
+    /** v1.8: pick the upstream resolver; applies to the next lookup, live. */
+    private fun showDnsProviderPicker() {
+        DnsProviders.load(this)
+        val list = DnsProviders.BUILT_IN
+        val labels = list.map { "${it.name}\n${it.blurb}" } + "Your own server…"
+        val cur = DnsProviders.current
+        val checked = list.indexOfFirst { it.id == cur.id }.let { if (it < 0) list.size else it }
+        AlertDialog.Builder(this)
+            .setTitle("Who answers allowed lookups?")
+            .setSingleChoiceItems(labels.toTypedArray(), checked) { d, i ->
+                if (i < list.size) {
+                    DnsProviders.select(this, list[i].id)
+                    Toast.makeText(this, "Using ${list[i].name} from now on.", Toast.LENGTH_SHORT).show()
+                    d.dismiss()
+                } else { d.dismiss(); showCustomDnsDialog() }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showCustomDnsDialog() {
+        val col = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+        }
+        val ip = android.widget.EditText(this).apply {
+            hint = "Server IP, e.g. 192.168.1.1"; isSingleLine = true
+            if (DnsProviders.current.id == DnsProviders.CUSTOM_ID) setText(DnsProviders.current.ip)
+        }
+        val doh = android.widget.EditText(this).apply {
+            hint = "Encrypted DNS URL (optional), https://…/dns-query"; isSingleLine = true
+            if (DnsProviders.current.id == DnsProviders.CUSTOM_ID) setText(DnsProviders.current.doh ?: "")
+        }
+        col.addView(ip); col.addView(doh)
+        AlertDialog.Builder(this)
+            .setTitle("Your own DNS server")
+            .setView(col)
+            .setPositiveButton("Use it") { _, _ ->
+                val p = DnsProviders.selectCustom(this, ip.text.toString(), doh.text.toString())
+                Toast.makeText(this, if (p != null) "Using ${p.ip} from now on." else
+                    "That's not a valid IPv4 address / https URL — nothing changed.", Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun checkAppUpdate() {

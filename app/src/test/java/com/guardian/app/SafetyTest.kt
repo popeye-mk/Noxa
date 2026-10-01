@@ -44,3 +44,29 @@ class SafetyTest {
         assertEquals(false, AppUpdater.isNewer("", "1.7"))
     }
 }
+
+class DnsProvidersTest {
+    @Test fun ipv4Validation() {
+        assertTrue(DnsProviders.isIpv4("192.168.1.1"))
+        assertTrue(DnsProviders.isIpv4("9.9.9.9"))
+        assertFalse(DnsProviders.isIpv4("256.1.1.1"))
+        assertFalse(DnsProviders.isIpv4("1.1.1"))
+        assertFalse(DnsProviders.isIpv4("01.1.1.1"))
+        assertFalse(DnsProviders.isIpv4("dns.quad9.net"))
+        assertFalse(DnsProviders.isIpv4(""))
+    }
+
+    @Test fun customProviderRules() {
+        assertTrue(DnsProviders.custom("10.0.0.1", "") != null)
+        assertEquals(null, DnsProviders.custom("10.0.0.1", "")!!.doh)
+        assertEquals("https://dns.example/dns-query", DnsProviders.custom("10.0.0.1", " https://dns.example/dns-query ")!!.doh)
+        assertEquals(null, DnsProviders.custom("10.0.0.1", "http://insecure.example/dns-query"))
+        assertEquals(null, DnsProviders.custom("not-an-ip", ""))
+    }
+
+    @Test fun builtInsAreDistinctAndEncrypted() {
+        assertEquals(DnsProviders.BUILT_IN.size, DnsProviders.BUILT_IN.map { it.id }.toSet().size)
+        assertTrue(DnsProviders.BUILT_IN.all { DnsProviders.isIpv4(it.ip) && it.doh!!.startsWith("https://") })
+        assertEquals("cloudflare", DnsProviders.current.id)   // default
+    }
+}

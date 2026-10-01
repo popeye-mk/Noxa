@@ -5,3 +5,7 @@ Safety and staying up to date:
   download page (Noxa never installs anything by itself)
 • Settings & tools → "Check for a new Noxa version"
 • Releases are now built and signed on GitHub, so updates ship faster
+• NEW choose who answers your lookups: Cloudflare (default), Quad9,
+  Mullvad, AdGuard, Google, or your own server — applies instantly
+• Fixed: apps are now named correctly on phones that use IPv6 DNS
+  (used to show as "system / unknown")
