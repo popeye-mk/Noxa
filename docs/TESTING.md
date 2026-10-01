@@ -61,6 +61,9 @@ VPN can run at a time: turn the other one OFF first.
 | 4b.5 | In Chrome open `https://flexispy.com` | Red "⚠ Stalkerware · Spyware" line in Live; once per day a "Spyware site reached (blocked)" notification naming the browser |
 | 4b.6 | Settings & tools → "Check for a new Noxa version" | "You have the latest version (…)" |
 | 4b.7 | Per-app details | Apps named properly; little or nothing under "system / unknown" |
+| 4b.8 | Settings & tools → "Protection check-up" | Each row green or amber; tap a Fix button → the right system screen opens; come back → row turns green |
+| 4b.9 | In Chrome open a known phishing test site, e.g. `http://testsafebrowsing.appspot.com/s/phishing.html` or any domain from `build-tools/out/threat-domains.txt` | "Dangerous site blocked" notification; red "⚠ Dangerous site" line in Live |
+| 4b.10 | Toggle Wi-Fi off/on while protected | Protection comes back within seconds by itself (no 15-min gap); status stays green |
 
 ## 5. Survival (overnight)
 

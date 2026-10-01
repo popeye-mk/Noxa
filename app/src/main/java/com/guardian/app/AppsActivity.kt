@@ -203,6 +203,7 @@ class AppsActivity : Activity() {
     /** All the advanced controls, in one calm plain-language menu. */
     private fun showToolsMenu() {
         val items = arrayOf(
+            "🛡  Protection check-up",
             "📡  Live — watch it happen",
             "🌐  Hide my IP (private tunnel)",
             "✓  Allowed sites (never block these)",
@@ -220,19 +221,20 @@ class AppsActivity : Activity() {
             .setTitle("Settings & tools")
             .setItems(items) { _, i ->
                 when (i) {
-                    0 -> startActivity(Intent(this, LiveActivity::class.java))
-                    1 -> startActivity(Intent(this, TunnelActivity::class.java))
-                    2 -> startActivity(Intent(this, AllowlistActivity::class.java))
-                    3 -> startActivity(Intent(this, AllowlistActivity::class.java)
+                    0 -> startActivity(Intent(this, CheckupActivity::class.java))
+                    1 -> startActivity(Intent(this, LiveActivity::class.java))
+                    2 -> startActivity(Intent(this, TunnelActivity::class.java))
+                    3 -> startActivity(Intent(this, AllowlistActivity::class.java))
+                    4 -> startActivity(Intent(this, AllowlistActivity::class.java)
                         .putExtra(AllowlistActivity.EXTRA_BLOCK, true))
-                    4 -> showExcludePicker()
-                    5 -> checkForUpdate()
-                    6 -> openAlwaysOn()
-                    7 -> exportCsv()
-                    8 -> pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
-                    9 -> pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
-                    10 -> checkAppUpdate()
-                    11 -> showDnsProviderPicker()
+                    5 -> showExcludePicker()
+                    6 -> checkForUpdate()
+                    7 -> openAlwaysOn()
+                    8 -> exportCsv()
+                    9 -> pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
+                    10 -> pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
+                    11 -> checkAppUpdate()
+                    12 -> showDnsProviderPicker()
                 }
             }
             .setNegativeButton("Close", null)

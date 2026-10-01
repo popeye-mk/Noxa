@@ -29,13 +29,33 @@ class WatchdogReceiver : BroadcastReceiver() {
         if (GuardianVpnService.isRunning.get()) return          // alive — nothing to do
         if (GuardianVpnService.isPaused(ctx)) return            // "Pause 5 min" still running
         if (TunnelController.isUp) return   // the user's TUNNEL holds the VPN slot — never steal it
-        if (VpnService.prepare(ctx) != null) return             // permission revoked — needs the app UI
+        if (VpnService.prepare(ctx) != null) {                  // permission revoked — needs the app UI
+            notifyStopped(ctx)                                  // v1.8: never a silent gap
+            return
+        }
         val svc = Intent(ctx, GuardianVpnService::class.java)
             .setAction(GuardianVpnService.ACTION_START)
         try {
             if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc)
             else ctx.startService(svc)
         } catch (_: Exception) { /* try again on the next tick */ }
+    }
+
+    /** Protection is wanted but can't restart by itself: say so, once. */
+    private fun notifyStopped(ctx: Context) {
+        try {
+            val mgr = ctx.getSystemService(android.app.NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= 26) {
+                mgr.createNotificationChannel(android.app.NotificationChannel(
+                    "guardian_alerts", "Security alerts", android.app.NotificationManager.IMPORTANCE_HIGH))
+            }
+            val open = PendingIntent.getActivity(ctx, 5, Intent(ctx, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+            mgr.notify(5, android.app.Notification.Builder(ctx, "guardian_alerts")
+                .setContentTitle("Noxa protection stopped")
+                .setContentText("Android removed Noxa's VPN permission. Tap to turn protection back on.")
+                .setSmallIcon(android.R.drawable.stat_sys_warning)
+                .setContentIntent(open).setAutoCancel(true).build())
+        } catch (_: Exception) {}
     }
 
     companion object {

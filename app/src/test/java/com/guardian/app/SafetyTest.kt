@@ -70,3 +70,42 @@ class DnsProvidersTest {
         assertEquals("cloudflare", DnsProviders.current.id)   // default
     }
 }
+
+class ThreatsTest {
+    private val asset = listOf("src/main/assets/threats.gbf", "app/src/main/assets/threats.gbf")
+        .map { File(it) }.first { it.exists() }
+    private val main = listOf("src/main/assets/guardian-default.gbf", "app/src/main/assets/guardian-default.gbf")
+        .map { File(it) }.first { it.exists() }
+
+    @Test fun bundledThreatFilterLoadsAndIsSubsetOfMain() {
+        val t = BloomFilter.load(asset.inputStream())
+        val m = BloomFilter.load(main.inputStream())
+        assertTrue(t.items in 50_000..2_000_000)
+        // everyday sites are never "dangerous"
+        for (d in listOf("google.com", "wikipedia.org", "github.com", "bbc.co.uk", "facebook.com"))
+            assertFalse(d, t.matchesHostOrParent(d))
+        // a few random names: not flagged
+        assertFalse(t.matchesHostOrParent("noxa-random-name-9f3a7c.com"))
+        assertTrue(m.items > t.items)
+    }
+
+    @Test fun alertRateLimits() {
+        val now = 1_000_000L
+        assertTrue(Threats.shouldAlert("a.scam.example", now))
+        assertFalse(Threats.shouldAlert("b.scam.example", now + 1))          // same site within a day
+        assertTrue(Threats.shouldAlert("scam2.example", now + 2))
+        assertTrue(Threats.shouldAlert("scam3.example", now + 3))
+        assertTrue(Threats.shouldAlert("scam4.example", now + 4))
+        assertFalse(Threats.shouldAlert("scam5.example", now + 5))           // 4 per hour max
+        assertTrue(Threats.shouldAlert("scam5.example", now + 61L * 60 * 1000))
+    }
+
+    @Test fun filterAgeDays() {
+        val now = 1_700_000_000_000L
+        val f = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        f.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        assertEquals(3, CheckupActivity.filterAgeDays(f.format(java.util.Date(now - 3L * 24 * 3600 * 1000 - 1000)), now))
+        assertEquals(0, CheckupActivity.filterAgeDays(f.format(java.util.Date(now)), now))
+        assertEquals(-1, CheckupActivity.filterAgeDays("", now))
+    }
+}

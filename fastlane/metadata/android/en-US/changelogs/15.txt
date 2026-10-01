@@ -9,3 +9,10 @@ Safety and staying up to date:
   Mullvad, AdGuard, Google, or your own server — applies instantly
 • Fixed: apps are now named correctly on phones that use IPv6 DNS
   (used to show as "system / unknown")
+• NEW dangerous-site alert: when a browser hits a known scam, phishing or
+  malware site, Noxa blocks it AND tells you not to enter passwords there;
+  a non-browser app doing it gets a stronger warning
+• NEW Protection check-up: what keeps you protected, what's missing, and a
+  one-tap fix for each (battery, Always-on, alerts, encryption, list age)
+• Protection now restarts itself within seconds if it ever dies, and tells
+  you if it can't

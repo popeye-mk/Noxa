@@ -36,6 +36,8 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
 - **Watch it live** — see every app's lookups as they happen; tap one to allow or block that site on the spot. Kept in memory only, never saved.
 - **Your own lists** — *Allowed sites* (never block) and *My blocked sites* (always block), editable any time.
+- **Dangerous-site alert** — ~260,000 known scam, phishing and malware domains are flagged separately: when a browser hits one, Noxa blocks it *and* says why ("don't enter passwords there"); a non-browser app doing it gets a stronger warning.
+- **Protection check-up** — one screen listing what keeps you protected (battery exemption, Always-on VPN, alerts, encryption, list age) with a one-tap fix for each.
 - **Spyware alert** — if any app tries to contact a known stalkerware server (~525 domains, refreshed weekly), Noxa blocks it *and* warns you, naming the app.
 - **Update notice** — a once-a-day anonymous check of this repo's Releases page; a notification links to the download page. Noxa never installs anything by itself.
 - **Home-screen widget + 7-day chart** — status, blocked-today and an on/off button on your home screen; a week of blocked trackers at a glance.

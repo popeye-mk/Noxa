@@ -81,7 +81,7 @@ android {
     }
     // The compiled Bloom filter ships as an asset; don't compress it.
     androidResources {
-        noCompress += "gbf"
+        noCompress += "gbf"   // guardian-default.gbf + threats.gbf
     }
 }
 

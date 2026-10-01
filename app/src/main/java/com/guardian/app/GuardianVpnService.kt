@@ -86,6 +86,10 @@ class GuardianVpnService : VpnService() {
         const val KEY_BLOCKED = "blocked"
         const val KEY_ALLOWED = "allowed"
         const val KEY_PERIOD_START = "period_start"
+        // Recorded on each start for the check-up screen (only a running
+        // VpnService can ask Android these).
+        const val KEY_ALWAYS_ON = "always_on"
+        const val KEY_LOCKDOWN = "lockdown"
         private const val RESET_MS = 30L * 24 * 60 * 60 * 1000   // roll the stats every 30 days
 
         // Canary domain: browsers query it before enabling DNS-over-HTTPS. Answer
@@ -201,7 +205,14 @@ class GuardianVpnService : VpnService() {
         if (running.get()) return
         filter = BloomFilter.loadCurrent(this)          // downloaded update, else bundled
         Stalkerware.load(this)
+        Threats.load(this)
         DnsProviders.load(this)
+        if (Build.VERSION.SDK_INT >= 29) {
+            try {
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(KEY_ALWAYS_ON, isAlwaysOn()).putBoolean(KEY_LOCKDOWN, isLockdownEnabled()).apply()
+            } catch (_: Exception) {}
+        }
         FilterUpdater.autoCheck(this)                   // quiet once-a-day refresh
         AppUpdater.autoCheck(this)                      // "a newer Noxa is available"
 
@@ -329,10 +340,16 @@ class GuardianVpnService : VpnService() {
                         // BLOCKED: sinkhole (0.0.0.0) + record WHO the tracker is (Phase 3).
                         onBlocked()
                         val spy = Stalkerware.matches(query.domain)
-                        val label = if (spy) Stalkerware.LABEL else Trackers.label(query.domain)
+                        val danger = !spy && Threats.matches(query.domain)
+                        val label = when {
+                            spy -> Stalkerware.LABEL
+                            danger -> Threats.LABEL
+                            else -> Trackers.label(query.domain)
+                        }
                         AppStats.recordBlocked(pkg, label)
-                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, if (spy) "⚠ $label" else label)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, if (spy || danger) "⚠ $label" else label)
                         if (spy) Stalkerware.alert(this, pkg, query.domain)
+                        if (danger) Threats.alert(this, pkg, query.domain)
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
@@ -358,8 +375,16 @@ class GuardianVpnService : VpnService() {
         }
         // If we fell out of the loop while still "running", the tunnel died
         // (e.g. network change / EOF). Shut down cleanly instead of leaving a
-        // hot, half-dead service — the user can flip the switch to restart.
-        if (running.get()) stopVpn()
+        // hot, half-dead service — and (v1.8) come straight back: the user
+        // still wants protection, so retry in a few seconds rather than
+        // waiting up to 15 min for the watchdog.
+        if (running.get()) {
+            stopVpn()
+            if (wantsProtection(this) && !isPaused(this) && !TunnelController.isUp) {
+                Log.w(TAG, "tunnel died unexpectedly — self-heal in 3 s")
+                WatchdogReceiver.scheduleResume(this, 3000)
+            }
+        }
     }
 
     /** Every block, from any path: the live counter + the per-day history. */
@@ -558,6 +583,7 @@ class GuardianVpnService : VpnService() {
                 val f = BloomFilter.loadCurrent(this)
                 filter = f
                 Stalkerware.load(this)
+                Threats.load(this)
                 Log.i(TAG, "filter reloaded live; items=${f.items}")
             } catch (e: Exception) { Log.w(TAG, "filter reload failed, keeping current: $e") }
         }, "guardian-filter-reload").start()

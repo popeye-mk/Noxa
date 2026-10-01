@@ -74,8 +74,8 @@ object Stalkerware {
     /** Show the warning, at most once per app per day. */
     fun alert(ctx: Context, pkg: String, domain: String) {
         val now = System.currentTimeMillis()
-        val last = lastAlert[pkg] ?: 0L
-        if (now - last < ALERT_COOLDOWN_MS) return
+        val last = lastAlert[pkg]                        // null = never alerted
+        if (last != null && now - last < ALERT_COOLDOWN_MS) return
         lastAlert[pkg] = now
         try {
             val mgr = ctx.getSystemService(NotificationManager::class.java)
