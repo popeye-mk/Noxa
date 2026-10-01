@@ -32,6 +32,19 @@ MUST_ALLOW = [
     "cdn77.org", "workers.dev", "files.wordpress.com",
     "firebase.googleapis.com", "firebaseinstallations.googleapis.com",
     "imgur.com", "i.imgur.com", "t.co", "bit.ly",
+    # Cloud hosting & storage: phishing pages live on these too, so lists
+    # sometimes name the whole provider — but blocking it breaks every app
+    # that stores photos/files/updates there (seen: Viber media on S3).
+    "amazonaws.com", "s3.amazonaws.com", "s3.eu-central-1.amazonaws.com",
+    "storage.googleapis.com", "firebasestorage.googleapis.com", "firebaseapp.com",
+    "blob.core.windows.net", "azurewebsites.net", "azureedge.net",
+    "github.io", "objects.githubusercontent.com", "pages.dev", "r2.dev",
+    "netlify.app", "vercel.app", "herokuapp.com", "digitaloceanspaces.com",
+    "dropbox.com", "dl.dropboxusercontent.com", "docs.google.com", "drive.google.com",
+    "sites.google.com", "sharepoint.com", "onedrive.live.com",
+    "dl-media.viber.com", "media.cdn.viber.com",
+    # A whole country zone (once blocked via a $badfilter misread).
+    "example.pl.ua",
     "google.com", "www.google.com", "wikipedia.org", "github.com", "mozilla.org",
     "signal.org", "apple.com", "microsoft.com", "gov.uk", "bbc.co.uk",
     "connectivitycheck.gstatic.com", "connectivitycheck.android.com",
