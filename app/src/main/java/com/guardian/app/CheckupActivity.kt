@@ -62,8 +62,14 @@ class CheckupActivity : Activity() {
         }
 
         val prefs = getSharedPreferences(GuardianVpnService.PREFS, Context.MODE_PRIVATE)
-        val alwaysOn = prefs.getBoolean(GuardianVpnService.KEY_ALWAYS_ON, false)
-        val lockdown = prefs.getBoolean(GuardianVpnService.KEY_LOCKDOWN, false)
+        // Ask the running protection NOW (the saved value can be stale if
+        // Always-on was switched on while Noxa was already running).
+        val liveAo = GuardianVpnService.liveAlwaysOn()
+        if (liveAo != null) prefs.edit()
+            .putBoolean(GuardianVpnService.KEY_ALWAYS_ON, liveAo.first)
+            .putBoolean(GuardianVpnService.KEY_LOCKDOWN, liveAo.second).apply()
+        val alwaysOn = liveAo?.first ?: prefs.getBoolean(GuardianVpnService.KEY_ALWAYS_ON, false)
+        val lockdown = liveAo?.second ?: prefs.getBoolean(GuardianVpnService.KEY_LOCKDOWN, false)
         out += Item(alwaysOn, "Always-on VPN",
             when {
                 alwaysOn && lockdown -> "On, with \"block connections without VPN\": nothing leaks, even if Noxa restarts."
@@ -104,11 +110,33 @@ class CheckupActivity : Activity() {
         val danger = g.filterKeys { it.startsWith("Dangerous site") }.values.sum()
         out += Item(spy == 0L, "Spyware servers contacted (30 days)",
             if (spy == 0L) "None — good sign." else "$spy attempt(s) blocked. Check the alerts and Per-app details.",
-            if (spy == 0L) null else "See which app") { startActivity(Intent(this, AppsActivity::class.java)) }
+            if (spy == 0L) null else "See which app") { showWhichApps("Stalkerware", "Spyware servers — last 30 days") }
         out += Item(true, "Dangerous sites blocked (30 days)",
             if (danger == 0L) "None yet." else "$danger scam/malware connection(s) stopped.")
         return out
     }
+
+    /** v1.9.2: "See which app" used to open the app list with no hint where to
+     *  look. Now it names the app(s) right away. */
+    private fun showWhichApps(prefix: String, title: String) {
+        val hits = AppStats.appsHitting(prefix)
+        val msg = if (hits.isEmpty()) "No app found — the count may be from before the last reset."
+        else hits.joinToString("\n\n") { (pkg, n) ->
+            "• ${appName(pkg)} — blocked $n time(s)"
+        } + "\n\nNoxa already blocked these, so nothing got through. " +
+            "If you don't recognise the app, consider uninstalling it."
+        android.app.AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(msg)
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Per-app details") { _, _ -> startActivity(Intent(this, AppsActivity::class.java)) }
+            .show()
+    }
+
+    private fun appName(pkg: String): String = try {
+        if (pkg == AppStats.UNKNOWN) "Android system / unknown app"
+        else packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+    } catch (_: Exception) { pkg }
 
     private fun refresh() = setContentView(buildUi())
 

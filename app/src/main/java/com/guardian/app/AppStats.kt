@@ -115,6 +115,14 @@ object AppStats {
         return out
     }
 
+    /** v1.9.2: which apps hit labels starting with [prefix] (e.g. "Stalkerware"),
+     *  biggest first — so the check-up can NAME the app instead of just a count. */
+    fun appsHitting(prefix: String): List<Pair<String, Long>> =
+        companiesByApp.mapNotNull { (pkg, m) ->
+            val n = m.filterKeys { it.startsWith(prefix) }.values.sum()
+            if (n > 0) pkg to n else null
+        }.sortedByDescending { it.second }
+
     /** Wipe the counters for a fresh stats period. Keeps firewall choices. */
     fun clearAll() {
         blocked.clear(); allowed.clear(); companiesByApp.clear()
