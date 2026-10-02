@@ -20,6 +20,10 @@ on:
       tag:
         description: "Release tag to (re)build and attach, e.g. v1.9"
         required: true
+      ref:
+        description: "Code to build (branch or commit). Empty = the tag's own code. Use 'main' to replace a wrong APK on an existing release without deleting it."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -32,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref != '' && inputs.ref || inputs.tag) || github.ref }}
 
       - name: Check signing secrets are set
         env:
