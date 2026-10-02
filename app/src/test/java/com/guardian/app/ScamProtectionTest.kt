@@ -132,4 +132,15 @@ class ScamProtectionTest {
         assertEquals(55L, AdwareScan.adLookups(counts))
         assertNotNull(AdwareScan.score(sig(ads = 55)).second.firstOrNull())
     }
+
+    /** Real sites the detector wrongly flagged in a scan of the top 100,000
+     *  websites (+160k hostnames in total) — must never be flagged again. */
+    @Test fun realSitesFromTop100kScanNotFlagged() {
+        for (h in listOf("wal-mart.com", "www.wal-mart.com", "1cloud.ru",
+                         "watson.telemetry.microsoft.com.nsatc.net"))
+            assertNull(h, FakeSites.lookalikeOf(h))
+        // and the real fakes are still caught
+        for (h in listOf("paypa1.com", "wa1mart.com", "icloud.com.verify-id.top", "netflix-billing-update.com"))
+            assertNotNull(h, FakeSites.lookalikeOf(h))
+    }
 }

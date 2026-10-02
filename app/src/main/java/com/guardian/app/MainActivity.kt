@@ -149,7 +149,9 @@ class MainActivity : Activity() {
     private fun updateCheckupHint(protectedNow: Boolean) {
         val pm = getSystemService(android.os.PowerManager::class.java)
         val issues = ArrayList<String>()
-        if (protectedNow && !pm.isIgnoringBatteryOptimizations(packageName)) issues += "battery"
+        val batteryConfirmed = getSharedPreferences("guardian_ui", MODE_PRIVATE)
+            .getBoolean(CheckupActivity.KEY_BATTERY_CONFIRMED, false)
+        if (protectedNow && !pm.isIgnoringBatteryOptimizations(packageName) && !batteryConfirmed) issues += "battery"
         if (!getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()) issues += "alerts"
         if (!GuardianVpnService.encryptedDns.get()) issues += "encryption"
         checkup.visibility = if (issues.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
