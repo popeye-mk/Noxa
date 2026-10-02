@@ -1,0 +1,5 @@
+Small fix:
+• The "new version available" notice now only appears in copies installed
+  from our GitHub releases. Copies from F-Droid (or test builds) get their
+  updates from where they were installed, so they're never sent to a
+  download that can't install over them.

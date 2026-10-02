@@ -33,3 +33,7 @@ noxa-v*.apk
 
 # --- Build-tool intermediate output (the compiled filter is copied into app/) ---
 /build-tools/out/
+
+# --- Python bytecode (binary — F-Droid's scanner flags it; never commit) ---
+__pycache__/
+*.pyc
