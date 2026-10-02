@@ -59,6 +59,10 @@ jobs:
           cp build-tools/out/manifest.json app/src/main/assets/blocklist-manifest.json
           cp build-tools/out/stalkerware.txt app/src/main/assets/stalkerware.txt
           cp build-tools/out/threats.gbf app/src/main/assets/threats.gbf
+          # optional (strict mode): only replaced when this week's download worked
+          if [ -s build-tools/out/risky-tlds.txt ]; then
+            cp build-tools/out/risky-tlds.txt app/src/main/assets/risky-tlds.txt
+          fi
           if git diff --quiet -- app/src/main/assets/guardian-default.gbf; then
             echo "changed=false" >> "$GITHUB_OUTPUT"; echo "Filter unchanged."
           else
@@ -76,12 +80,14 @@ jobs:
             build-tools/out/build-report.txt
             build-tools/out/stalkerware.txt
             build-tools/out/threats.gbf
+            build-tools/out/risky-tlds.txt
+          if-no-files-found: warn
 
       - name: Commit (main only)
         if: github.ref == 'refs/heads/main' && steps.stage.outputs.changed == 'true'
         run: |
           git config user.name "noxa-filter-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/assets/guardian-default.gbf app/src/main/assets/blocklist-manifest.json app/src/main/assets/stalkerware.txt app/src/main/assets/threats.gbf
+          git add app/src/main/assets/guardian-default.gbf app/src/main/assets/blocklist-manifest.json app/src/main/assets/stalkerware.txt app/src/main/assets/threats.gbf app/src/main/assets/risky-tlds.txt
           git commit -m "Weekly blocklist rebuild ($(date -u +%Y-%m-%d))"
           git push

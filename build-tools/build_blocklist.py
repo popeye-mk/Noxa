@@ -136,7 +136,22 @@ ALLOWLIST_DOMAINS = [
 # filter (so it's blocked either way); the app uses this one only to tell the
 # user WHY — "that link is a known scam site" — instead of a silent failure.
 THREAT_CATEGORIES = ["phishing", "malware", "cryptojacking", "ddos", "hacking", "dialer"]
-THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin"]
+THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif_mini", "urlhaus"]
+
+# v1.10 optional "Strict scam protection": whole web endings (TLDs) that are
+# mostly used for scams. Shipped as a small text list, applied on the phone
+# ONLY when the user switches it on. These endings are never allowed in it,
+# whatever the source says — blocking them would break the normal web.
+RISKY_TLDS_SOURCE = "blocklists/hagezi/spam_tlds.txt"
+NEVER_RISKY_TLDS = {
+    "com", "net", "org", "edu", "gov", "mil", "int", "info", "io", "app", "dev",
+    "co", "me", "tv", "eu", "uk", "co.uk", "nl", "mk", "de", "fr", "be", "at",
+    "ch", "it", "es", "pt", "pl", "se", "no", "dk", "fi", "us", "ca", "au",
+    "rs", "bg", "gr", "al", "si", "hr", "ba", "ro", "hu", "cz", "sk", "tr",
+    "ru", "ua", "jp", "cn", "in", "br", "mx", "ar", "za", "nz", "ie", "lu",
+    "org.mk", "com.mk", "gov.mk", "edu.mk", "net.mk", "xyz", "online", "site",
+    "store", "shop", "tech", "cloud", "ai", "page", "blog", "news",
+}
 
 # Curated tracking-only endpoints that are ALWAYS blocked, whatever the
 # upstream lists contain this week. Keep this tiny and tracking-only: never an
@@ -226,7 +241,32 @@ EXTRA_SOURCES = {
     # now refuses any filter that blocks Meta's core apps.
     "nocoin":         ("blocklists/nocoin/hosts.txt",         "hosts"),    # cryptomining
     "phishing_army":  ("blocklists/phishing/phishing_army.txt","domains"), # phishing
+    # v1.10 stronger malware protection (also feed the dangerous-site alert):
+    "hagezi_tif_mini": ("blocklists/hagezi/tif_mini.txt",     "adblock"),  # threat intel
+    "urlhaus":        ("blocklists/urlhaus/hostfile.txt",     "hosts"),    # malware hosts
 }
+
+
+def read_risky_tlds(path):
+    """'||cam^' lines -> 'cam'. Only bare web endings (one or two labels),
+    never anything on NEVER_RISKY_TLDS. Returns a sorted list (may be empty)."""
+    out = set()
+    if not os.path.isfile(path):
+        return []
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            s = line.strip().lower()
+            if not s.startswith("||") or not s.endswith("^"):
+                continue
+            t = s[2:-1]
+            if not t or t.count(".") > 1 or t.startswith(".") or t.endswith("."):
+                continue
+            if not all(c in "abcdefghijklmnopqrstuvwxyz0123456789-." for c in t):
+                continue
+            if t in NEVER_RISKY_TLDS:
+                continue
+            out.add(t)
+    return sorted(out)
 
 
 def read_hosts(path):
@@ -493,6 +533,23 @@ def main():
         f.write(stalk_text)
     stalk_sha256 = hashlib.sha256(stalk_text.encode("utf-8")).hexdigest()
     print("Stalkerware list: %d domains" % len(stalk))
+
+    # v1.10 risky web endings for the optional strict mode. If the source
+    # didn't download, nothing is written and the manifest has no hash, so
+    # phones simply keep the list they already have.
+    risky = read_risky_tlds(os.path.join(ROOT, RISKY_TLDS_SOURCE))
+    risky_sha256 = ""
+    risky_path = os.path.join(OUT, "risky-tlds.txt")
+    if risky:
+        risky_text = "\n".join(risky) + "\n"
+        with open(risky_path, "w") as f:
+            f.write(risky_text)
+        risky_sha256 = hashlib.sha256(risky_text.encode("utf-8")).hexdigest()
+        print("Risky web endings (strict mode): %d" % len(risky))
+    else:
+        if os.path.exists(risky_path):
+            os.remove(risky_path)
+        print("Risky web endings: source missing — skipped")
     build_s = time.time() - t0
 
     with open(os.path.join(OUT, "merged-domains.txt"), "w") as f:
@@ -507,6 +564,8 @@ def main():
         "threats_sha256": threats_sha256,
         "threats_domains": len(threats),
         "stalkerware_domains": len(stalk),
+        "risky_tlds_sha256": risky_sha256,
+        "risky_tlds": len(risky),
         "bloom": {"m_bits": m_bits, "k_hashes": k,
                   "size_mb": round(size_mb, 3), "items": n},
         "unique_domains": n,

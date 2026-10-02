@@ -65,6 +65,28 @@ object Threats {
 
     fun alert(ctx: Context, pkg: String, domain: String) {
         if (!shouldAlert(domain)) return
+        val app = appName(ctx, pkg)
+        val browser = pkg == AppStats.UNKNOWN || looksLikeBrowser(ctx, pkg)
+        val title = if (browser) "Dangerous site blocked" else "⚠ $app reached a dangerous server"
+        val body = if (browser)
+            "$domain is a known scam, phishing or malware site. Noxa blocked it. " +
+            "Don't enter passwords or card details there — if you got this link in a " +
+            "message or email, it's likely a scam."
+        else
+            "$app tried to contact $domain, a known scam/malware server, and Noxa blocked it. " +
+            "Apps you trust rarely do this. If it keeps happening, consider removing the app " +
+            "(Per-app details shows what else it reaches)."
+        show(ctx, domain, title, body)
+    }
+
+    /** v1.10: same rate-limited security alert, with the caller's wording
+     *  (fake look-alike sites, strict-mode blocks). */
+    fun warn(ctx: Context, domain: String, title: String, body: String) {
+        if (!shouldAlert(domain)) return
+        show(ctx, domain, title, body)
+    }
+
+    private fun show(ctx: Context, domain: String, title: String, body: String) {
         try {
             val mgr = ctx.getSystemService(NotificationManager::class.java)
             if (android.os.Build.VERSION.SDK_INT >= 26) {
@@ -72,17 +94,6 @@ object Threats {
                     NotificationChannel(CHANNEL_ID, "Security alerts", NotificationManager.IMPORTANCE_HIGH)
                 )
             }
-            val app = appName(ctx, pkg)
-            val browser = pkg == AppStats.UNKNOWN || looksLikeBrowser(ctx, pkg)
-            val title = if (browser) "Dangerous site blocked" else "⚠ $app reached a dangerous server"
-            val body = if (browser)
-                "$domain is a known scam, phishing or malware site. Noxa blocked it. " +
-                "Don't enter passwords or card details there — if you got this link in a " +
-                "message or email, it's likely a scam."
-            else
-                "$app tried to contact $domain, a known scam/malware server, and Noxa blocked it. " +
-                "Apps you trust rarely do this. If it keeps happening, consider removing the app " +
-                "(Per-app details shows what else it reaches)."
             val open = PendingIntent.getActivity(ctx, NOTIF_BASE, Intent(ctx, LiveActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE)
             mgr.notify(NOTIF_BASE + (domain.hashCode() and 0x7FFF), Notification.Builder(ctx, CHANNEL_ID)

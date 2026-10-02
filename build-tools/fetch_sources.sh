@@ -52,6 +52,16 @@ get "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Alternate%2
 # endpoints are already covered by the other lists (connect.facebook.net etc.).
 get "https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/hosts.txt"      "nocoin/hosts.txt"
 get "https://phishing.army/download/phishing_army_blocklist_extended.txt"                   "phishing/phishing_army.txt"
+# v1.10 stronger malware protection:
+# HaGeZi Threat Intelligence Feeds, "mini" (~180k of the most important
+# malware / phishing / scam / C2 feeds — sized for phones).
+get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/tif.mini.txt"     "hagezi/tif_mini.txt"
+# abuse.ch URLhaus: hosts serving malware downloads right now (small, fresh).
+get "https://urlhaus.abuse.ch/downloads/hostfile/"                                           "urlhaus/hostfile.txt"
+# HaGeZi "Most Abused TLDs" (no-exclusions version): the web endings scammers
+# use most. NOT added to the main filter — it powers the optional
+# "Strict scam protection" switch in the app (off by default).
+get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/spam-tlds-adblock.txt" "hagezi/spam_tlds.txt"
 
 if [ ${#failed[@]} -gt 0 ]; then
   echo "WARNING: ${#failed[@]} optional source(s) failed: ${failed[*]}"
