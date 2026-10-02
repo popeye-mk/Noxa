@@ -1,8 +1,9 @@
+New:
+• Fake-site warning: blocks look-alikes of banks and brands (paypa1.com)
+• Find the app behind pop-up ads
+• Strict scam protection (optional): blocks web endings scammers use most
+• Stronger malware lists (HaGeZi Threat Intel, URLhaus)
 Fixes:
-• Protection check-up: "Always-on VPN" now shows the real state right away
-  (before, it kept saying "Off" until Noxa restarted)
-• Protection check-up: "See which app" now names the app that contacted a
-  spyware server, instead of just opening the app list
-• Includes the 1.9.1 fixes: Amazon's cloud (Viber photos) no longer blocked
-  by mistake; the update notice only appears in copies from our GitHub
-  releases (F-Droid copies update through F-Droid)
+• Check-up shows Always-on correctly and names the spyware app
+• Viber photos (Amazon cloud) no longer blocked
+• Update notice only in GitHub copies; F-Droid updates via F-Droid

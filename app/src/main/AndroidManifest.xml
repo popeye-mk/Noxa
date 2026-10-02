@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -11,6 +12,12 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- v1.2 keep-alive: restart protection automatically after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- v1.10 "Find the app behind pop-up ads": pop-up ad apps usually HIDE
+         their icon, so a launcher <queries> can't see them — only this can.
+         Read on the phone to name the culprit; the app list never leaves the
+         device (Noxa has no server). Also lets per-app stats name such apps. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <!-- Android TV support: TVs are among the most tracker-infested devices
          people own (ACR, ad platforms, telemetry in every streaming app) and
@@ -74,6 +81,11 @@
         <!-- v1.8 protection check-up: what's protecting you, one-tap fixes. -->
         <activity
             android:name=".CheckupActivity"
+            android:exported="false" />
+
+        <!-- v1.10 pop-up ad app finder. -->
+        <activity
+            android:name=".AdwareActivity"
             android:exported="false" />
 
         <!-- v1.5 live feed: watch lookups happen, fix a block in one tap. -->
