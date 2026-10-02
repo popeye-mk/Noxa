@@ -1,0 +1,8 @@
+Fixes:
+• Protection check-up: "Always-on VPN" now shows the real state right away
+  (before, it kept saying "Off" until Noxa restarted)
+• Protection check-up: "See which app" now names the app that contacted a
+  spyware server, instead of just opening the app list
+• Includes the 1.9.1 fixes: Amazon's cloud (Viber photos) no longer blocked
+  by mistake; the update notice only appears in copies from our GitHub
+  releases (F-Droid copies update through F-Droid)

@@ -156,6 +156,20 @@ class GuardianVpnService : VpnService() {
         // service picks it up on its next lookup and swaps the filter live.
         private val filterReload = AtomicBoolean(false)
         fun requestFilterReload() = filterReload.set(true)
+        // v1.9.2: the check-up asks the RUNNING service live. Before, Always-on
+        // was only recorded at start, so switching it on while Noxa ran still
+        // showed "Off" until the next restart. Weak ref: never leaks the service.
+        @Volatile private var live: java.lang.ref.WeakReference<GuardianVpnService>? = null
+
+        /** (alwaysOn, lockdown) from the running service; null if not running
+         *  or Android < 10 (the API doesn't exist there). */
+        fun liveAlwaysOn(): Pair<Boolean, Boolean>? {
+            if (Build.VERSION.SDK_INT < 29) return null
+            val s = live?.get() ?: return null
+            if (!isRunning.get()) return null
+            return try { s.isAlwaysOn() to s.isLockdownEnabled() } catch (_: Exception) { null }
+        }
+
         fun wantsProtection(ctx: Context): Boolean =
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WANT, false)
         fun setWantsProtection(ctx: Context, on: Boolean) {
@@ -681,7 +695,9 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    override fun onDestroy() { stopVpn(); super.onDestroy() }
+    override fun onCreate() { super.onCreate(); live = java.lang.ref.WeakReference(this) }
+
+    override fun onDestroy() { live = null; stopVpn(); super.onDestroy() }
 
     // --- notification (foreground service requirement) -----------------------
     /** v1.7: the persistent notification carries today's count. Same ID +
