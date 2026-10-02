@@ -120,6 +120,12 @@ Notes for the F-Droid reviewers (also useful in the RFP text):
   F-Droid's key) and Noxa TEST builds never run it, so they're never pointed
   at a GitHub APK that couldn't install over them. If the release key is ever
   rotated, update that constant.
+- `QUERY_ALL_PACKAGES` (v1.10): used only by "Find the app behind pop-up ads",
+  which must see apps that hide their launcher icon (a launcher `<queries>`
+  can't). The app list is read on the device and never sent anywhere.
+- v1.10 fake-site warning and "Strict scam protection" run entirely on the
+  device (a brand look-alike check, and a bundled list of risky web endings,
+  `risky-tlds.txt`, refreshed with the weekly blocklist). No new network calls.
 - `app/debug.keystore` is a PUBLIC, test-only key (password "android") for the
   `.test` debug variant, so CI test builds install over each other. Release
   builds never use it.

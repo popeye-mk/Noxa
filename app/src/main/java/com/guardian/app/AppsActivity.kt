@@ -201,21 +201,16 @@ class AppsActivity : Activity() {
     }
 
     /** All the advanced controls, in one calm plain-language menu. */
+    /** v1.10.1: the everyday things only — the rest lives under "More". */
     private fun showToolsMenu() {
         val items = arrayOf(
             "🛡  Protection check-up",
             "📡  Live — watch it happen",
-            "🌐  Hide my IP (private tunnel)",
-            "✓  Allowed sites (never block these)",
-            "⛔  My blocked sites (always block these)",
+            "✓  Allowed & blocked sites",
             "🔧  Fix an app that won't work",
-            "🔄  Update protection now",
-            "🔋  Keep protection always on",
-            "📄  Save my report",
-            "💾  Back up my settings",
-            "📂  Restore settings from a backup",
-            "⬆️  Check for a new Noxa version",
-            "🌍  DNS provider (who answers lookups)"
+            "🕵  Find the app behind pop-up ads",
+            "🌐  Hide my IP (private tunnel)",
+            "⚙  More settings…"
         )
         AlertDialog.Builder(this)
             .setTitle("Settings & tools")
@@ -223,21 +218,62 @@ class AppsActivity : Activity() {
                 when (i) {
                     0 -> startActivity(Intent(this, CheckupActivity::class.java))
                     1 -> startActivity(Intent(this, LiveActivity::class.java))
-                    2 -> startActivity(Intent(this, TunnelActivity::class.java))
-                    3 -> startActivity(Intent(this, AllowlistActivity::class.java))
-                    4 -> startActivity(Intent(this, AllowlistActivity::class.java)
-                        .putExtra(AllowlistActivity.EXTRA_BLOCK, true))
-                    5 -> showExcludePicker()
-                    6 -> checkForUpdate()
-                    7 -> openAlwaysOn()
-                    8 -> exportCsv()
-                    9 -> pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
-                    10 -> pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
-                    11 -> checkAppUpdate()
-                    12 -> showDnsProviderPicker()
+                    2 -> showSiteLists()
+                    3 -> showExcludePicker()
+                    4 -> startActivity(Intent(this, AdwareActivity::class.java))
+                    5 -> startActivity(Intent(this, TunnelActivity::class.java))
+                    6 -> showMoreMenu()
                 }
             }
             .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showSiteLists() {
+        AlertDialog.Builder(this)
+            .setTitle("Allowed & blocked sites")
+            .setItems(arrayOf(
+                "✓  Allowed sites (never block these)",
+                "⛔  My blocked sites (always block these)"
+            )) { _, i ->
+                startActivity(Intent(this, AllowlistActivity::class.java)
+                    .putExtra(AllowlistActivity.EXTRA_BLOCK, i == 1))
+            }
+            .setNegativeButton("Back") { _, _ -> showToolsMenu() }
+            .show()
+    }
+
+    /** Rarely needed: set once, or done automatically anyway. */
+    private fun showMoreMenu() {
+        ScamShield.load(this)
+        val items = arrayOf(
+            "🧱  Strict scam protection: " + (if (ScamShield.isOn) "ON" else "off"),
+            "🌍  DNS provider (who answers lookups)",
+            "🔄  Update protection now",
+            "⬆️  Check for a new Noxa version",
+            "💾  Back up / restore my settings",
+            "📄  Save my report (CSV)"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("More settings")
+            .setItems(items) { _, i ->
+                when (i) {
+                    0 -> showStrictDialog()
+                    1 -> showDnsProviderPicker()
+                    2 -> checkForUpdate()
+                    3 -> checkAppUpdate()
+                    4 -> AlertDialog.Builder(this)
+                        .setTitle("Back up / restore")
+                        .setItems(arrayOf("💾  Back up my settings to a file", "📂  Restore from a backup file")) { _, j ->
+                            if (j == 0) pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
+                            else pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
+                        }
+                        .setNegativeButton("Back") { _, _ -> showMoreMenu() }
+                        .show()
+                    5 -> exportCsv()
+                }
+            }
+            .setNegativeButton("Back") { _, _ -> showToolsMenu() }
             .show()
     }
 
@@ -342,6 +378,28 @@ class AppsActivity : Activity() {
             .show()
     }
 
+    /** v1.10 optional strict mode — explained before it's switched on. */
+    private fun showStrictDialog() {
+        val on = ScamShield.isOn
+        AlertDialog.Builder(this)
+            .setTitle("Strict scam protection")
+            .setMessage(
+                "Blocks every website that uses one of ${ScamShield.size} web endings scammers use " +
+                "most (like .cam, .loan, .bond). Normal endings like .com, .nl and .mk are never affected.\n\n" +
+                "Strong protection against new scam sites that no list knows yet — but strict: a real " +
+                "shop using one of those endings is blocked too. If that happens, Noxa tells you, and " +
+                "you can allow the site under Allowed sites.\n\n" +
+                "It is " + (if (on) "ON." else "off."))
+            .setPositiveButton(if (on) "Turn off" else "Turn on") { _, _ ->
+                ScamShield.setOn(this, !on)
+                Toast.makeText(this,
+                    if (on) "Strict scam protection is off." else "Strict scam protection is on.",
+                    Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
     private fun checkAppUpdate() {
         Toast.makeText(this, "Checking…", Toast.LENGTH_SHORT).show()
         Thread {
@@ -358,13 +416,6 @@ class AppsActivity : Activity() {
         }.start()
     }
 
-    private fun openAlwaysOn() {
-        Toast.makeText(this,
-            "Tap the gear ⚙ next to Noxa, then turn on \"Always-on VPN\".",
-            Toast.LENGTH_LONG).show()
-        try { startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS)) }
-        catch (_: Exception) {}
-    }
 
     /** Tap an app -> plain-language breakdown + the "don't filter" escape hatch. */
     private fun showDetail(name: String, pkg: String) {
