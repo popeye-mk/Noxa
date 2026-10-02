@@ -1,0 +1,7 @@
+Simpler and calmer, from your feedback:
+• Settings & tools is shorter: the everyday things first, the rest under
+  "More settings"; allowed and blocked sites in one place
+• Check-up no longer says "not allowed in the background" on Xiaomi and
+  other phones where you already chose "No restrictions" — confirm it once
+• Visiting a spyware website in your browser no longer turns the check-up
+  amber; only an app contacting a spyware server does
