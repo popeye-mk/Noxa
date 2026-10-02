@@ -234,6 +234,7 @@ class GuardianVpnService : VpnService() {
         filter = BloomFilter.loadCurrent(this)          // downloaded update, else bundled
         Stalkerware.load(this)
         Threats.load(this)
+        ScamShield.load(this)
         DnsProviders.load(this)
         if (Build.VERSION.SDK_INT >= 29) {
             try {
@@ -382,9 +383,32 @@ class GuardianVpnService : VpnService() {
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
-                        // ALLOWED (unless CNAME-uncloaking finds a tracker in the
-                        // answer). answer() does the allowed/blocked counting.
-                        resolve(buffer, length, query, pkg, output)
+                        // v1.10: not on any list — but does it IMPERSONATE a brand
+                        // (paypa1.com), or use a risky ending with strict mode on?
+                        val fake = FakeSites.lookalikeOf(query.domain)
+                        val risky = if (fake == null) ScamShield.riskyEnding(query.domain) else null
+                        if (fake != null || risky != null) {
+                            onBlocked()
+                            val label = if (fake != null) FakeSites.LABEL else ScamShield.LABEL
+                            AppStats.recordBlocked(pkg, label)
+                            LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED,
+                                if (fake != null) "⚠ Pretends to be ${fake.name}" else "⚠ Risky ending .$risky (strict mode)")
+                            if (fake != null) Threats.warn(this, query.domain,
+                                "⚠ Fake ${fake.name} site blocked",
+                                "${query.domain} pretends to be ${fake.name}, but it is not ${fake.name}'s " +
+                                "real website. Noxa blocked it. Don't enter passwords or card details " +
+                                "there. If you're sure it's genuine, add it under Settings & tools → Allowed sites.")
+                            else Threats.warn(this, query.domain,
+                                "Risky website blocked",
+                                "${query.domain} uses the .$risky ending, which is mostly used for scams, so " +
+                                "Strict scam protection blocked it. If you trust this site, add it under " +
+                                "Settings & tools → Allowed sites.")
+                            DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
+                        } else {
+                            // ALLOWED (unless CNAME-uncloaking finds a tracker in the
+                            // answer). answer() does the allowed/blocked counting.
+                            resolve(buffer, length, query, pkg, output)
+                        }
                     }
                 }
                 // Save the totals to disk every 30 s so a kill can't lose much —
@@ -618,6 +642,7 @@ class GuardianVpnService : VpnService() {
                 filter = f
                 Stalkerware.load(this)
                 Threats.load(this)
+                ScamShield.load(this)
                 Log.i(TAG, "filter reloaded live; items=${f.items}")
             } catch (e: Exception) { Log.w(TAG, "filter reload failed, keeping current: $e") }
         }, "guardian-filter-reload").start()

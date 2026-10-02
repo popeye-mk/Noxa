@@ -173,6 +173,22 @@ check("stalkerware hash matches manifest",
       hashlib.sha256(("\n".join(sorted(set(stalk))) + "\n").encode()).hexdigest() == manifest.get("stalkerware_sha256"))
 check("stalkerware domains are all blocked by the filter", all(blocked(d) for d in stalk[:2000]))
 
+# v1.10 risky web endings (optional strict mode). Optional file: if the
+# source failed it's absent and the manifest hash is empty — phones keep theirs.
+risky_path = os.path.join(OUT, "risky-tlds.txt")
+if os.path.isfile(risky_path):
+    import build_blocklist
+    risky = [l.strip() for l in open(risky_path) if l.strip()]
+    check("risky endings list sane (20..400)", 20 <= len(risky) <= 400, f"{len(risky)}")
+    check("risky endings hash matches manifest",
+          hashlib.sha256(("\n".join(risky) + "\n").encode()).hexdigest() == manifest.get("risky_tlds_sha256"))
+    bad_tlds = [t for t in risky if t in build_blocklist.NEVER_RISKY_TLDS]
+    check("risky endings never include everyday ones (.com, .nl, .mk, ...)", not bad_tlds, ", ".join(bad_tlds))
+    hit = [d for d in MUST_ALLOW if any(d == t or d.endswith("." + t) for t in risky)]
+    check("risky endings don't cover any must-allow site", not hit, ", ".join(hit[:8]))
+else:
+    check("no risky endings => manifest has no hash", not manifest.get("risky_tlds_sha256"))
+
 if os.path.isfile(SHIPPED):
     old = json.load(open(SHIPPED)).get("unique_domains", 0)
     if old:

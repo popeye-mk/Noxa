@@ -202,6 +202,7 @@ class AppsActivity : Activity() {
 
     /** All the advanced controls, in one calm plain-language menu. */
     private fun showToolsMenu() {
+        ScamShield.load(this)
         val items = arrayOf(
             "🛡  Protection check-up",
             "📡  Live — watch it happen",
@@ -215,7 +216,9 @@ class AppsActivity : Activity() {
             "💾  Back up my settings",
             "📂  Restore settings from a backup",
             "⬆️  Check for a new Noxa version",
-            "🌍  DNS provider (who answers lookups)"
+            "🌍  DNS provider (who answers lookups)",
+            "🕵  Find the app behind pop-up ads",
+            "🧱  Strict scam protection: " + (if (ScamShield.isOn) "ON" else "off")
         )
         AlertDialog.Builder(this)
             .setTitle("Settings & tools")
@@ -235,6 +238,8 @@ class AppsActivity : Activity() {
                     10 -> pickFile(Intent.ACTION_OPEN_DOCUMENT, REQ_RESTORE)
                     11 -> checkAppUpdate()
                     12 -> showDnsProviderPicker()
+                    13 -> startActivity(Intent(this, AdwareActivity::class.java))
+                    14 -> showStrictDialog()
                 }
             }
             .setNegativeButton("Close", null)
@@ -339,6 +344,28 @@ class AppsActivity : Activity() {
                     "That's not a valid IPv4 address / https URL — nothing changed.", Toast.LENGTH_LONG).show()
             }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** v1.10 optional strict mode — explained before it's switched on. */
+    private fun showStrictDialog() {
+        val on = ScamShield.isOn
+        AlertDialog.Builder(this)
+            .setTitle("Strict scam protection")
+            .setMessage(
+                "Blocks every website that uses one of ${ScamShield.size} web endings scammers use " +
+                "most (like .cam, .loan, .bond). Normal endings like .com, .nl and .mk are never affected.\n\n" +
+                "Strong protection against new scam sites that no list knows yet — but strict: a real " +
+                "shop using one of those endings is blocked too. If that happens, Noxa tells you, and " +
+                "you can allow the site under Allowed sites.\n\n" +
+                "It is " + (if (on) "ON." else "off."))
+            .setPositiveButton(if (on) "Turn off" else "Turn on") { _, _ ->
+                ScamShield.setOn(this, !on)
+                Toast.makeText(this,
+                    if (on) "Strict scam protection is off." else "Strict scam protection is on.",
+                    Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Close", null)
             .show()
     }
 

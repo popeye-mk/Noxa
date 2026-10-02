@@ -27,6 +27,7 @@ object FilterUpdater {
     private const val FILTER_URL = "$BASE/guardian-default.gbf"
     private const val STALKERWARE_URL = "$BASE/${Stalkerware.FILE}"
     private const val THREATS_URL = "$BASE/${Threats.FILE}"
+    private const val RISKY_URL = "$BASE/${ScamShield.FILE}"
 
     private const val PREFS = "guardian_filter"
     private const val KEY_BUILT_AT = "filter_built_at"
@@ -87,6 +88,12 @@ object FilterUpdater {
             val thrOk = thr != null && BloomFilter.isValidFile(thr) &&
                 sha256Hex(thr).equals(thrExpected, ignoreCase = true)
 
+            // v1.10 risky web endings (strict mode): same rules again.
+            val riskyExpected = json.optString("risky_tlds_sha256", "")
+            val risky = if (riskyExpected.isEmpty()) null else httpGet(RISKY_URL)
+            val riskyOk = risky != null && sha256Hex(risky).equals(riskyExpected, ignoreCase = true) &&
+                ScamShield.parse(String(risky, Charsets.UTF_8)).size in 20..400
+
             val tmp = File(ctx.filesDir, "$FILTER_FILE.tmp")
             tmp.writeBytes(gbf)
             val dst = File(ctx.filesDir, FILTER_FILE)
@@ -102,6 +109,12 @@ object FilterUpdater {
                 stmp.writeBytes(spy!!)
                 val sdst = File(ctx.filesDir, Stalkerware.FILE)
                 if (!stmp.renameTo(sdst)) { stmp.copyTo(sdst, overwrite = true); stmp.delete() }
+            }
+            if (riskyOk) {
+                val rtmp = File(ctx.filesDir, "${ScamShield.FILE}.tmp")
+                rtmp.writeBytes(risky!!)
+                val rdst = File(ctx.filesDir, ScamShield.FILE)
+                if (!rtmp.renameTo(rdst)) { rtmp.copyTo(rdst, overwrite = true); rtmp.delete() }
             }
 
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
