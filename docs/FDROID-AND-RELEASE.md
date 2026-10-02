@@ -115,6 +115,14 @@ Notes for the F-Droid reviewers (also useful in the RFP text):
   to this repo on GitHub (raw file / Releases API), DNS/DoH resolution
   itself, and the user's own WireGuard tunnel. Noxa never downloads or
   installs code by itself — the update notice only opens the release page.
+- The "new version?" check only runs in copies signed with our GitHub release
+  key (`AppUpdater.RELEASE_CERT_SHA256`, v1.9.1+). F-Droid builds (signed with
+  F-Droid's key) and Noxa TEST builds never run it, so they're never pointed
+  at a GitHub APK that couldn't install over them. If the release key is ever
+  rotated, update that constant.
+- `app/debug.keystore` is a PUBLIC, test-only key (password "android") for the
+  `.test` debug variant, so CI test builds install over each other. Release
+  builds never use it.
 - The compiled blocklist (`guardian-default.gbf`) is a build artifact of
   `build-tools/build_blocklist.py` over public lists; committed so the app
   builds offline.
