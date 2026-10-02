@@ -102,12 +102,15 @@ object FakeSites {
         "trafficmanager.net", "azureedge.net", "azurefd.net", "edgecastcdn.net", "llnwd.net",
         "cdn77.org", "2o7.net", "omtrdc.net", "sc.omtrdc.net", "chinacache.net", "wscdns.com",
         "kunlunca.com", "alikunlun.com", "cdngslb.com", "akadns.net", "akamaitechnologies.com",
+        "nsatc.net",   // Microsoft's own server network (*.microsoft.com.nsatc.net)
     )
 
     /** Real names that happen to look like a brand (i reads as l). */
     private val KNOWN_REAL = setOf(
         "appie",     // Albert Heijn's app (NL), not Apple
         "gmall", "lcloud",
+        "wal-mart",  // Walmart's own old domain (found scanning the top 100k sites)
+        "1cloud",    // 1cloud.ru, a real hosting company — not iCloud
     )
 
     // Letters from other alphabets that look like Latin ones.
