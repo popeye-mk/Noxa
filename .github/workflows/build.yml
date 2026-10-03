@@ -37,8 +37,13 @@ jobs:
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
 
+      # A plain .apk (not a zip) so it can be tapped and installed straight
+      # from a phone. archive:false names the artifact after the file.
+      - name: Name the test APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk noxa-TEST.apk
+
       - uses: actions/upload-artifact@v7
         with:
-          name: noxa-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: noxa-TEST.apk
+          archive: false
           if-no-files-found: error
