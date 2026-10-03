@@ -49,6 +49,14 @@ object NetworkWatcher {
     /** True when the phone is on mobile data only (no Wi-Fi / Ethernet up). */
     val onMobileData: Boolean get() = wifi.isEmpty() && cellular.isNotEmpty()
 
+    /** v1.13: a Wi-Fi still behind a login page (or not yet working). Its
+     *  login page often answers with private addresses, so the router attack
+     *  shield stands aside until the network is validated. */
+    val loginPending: Boolean get() = wifi.values.any {
+        it.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) ||
+            !it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
     fun start(ctx: Context) {
         if (registered) return
         val app = ctx.applicationContext
