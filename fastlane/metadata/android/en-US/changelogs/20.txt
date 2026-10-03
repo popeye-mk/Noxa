@@ -12,3 +12,9 @@ Noxa looks after itself:
 • DNS provider: "Test speed" times each provider on your network and marks
   the fastest
 • Shorter menu: list and app updates are fully automatic now
+• If Noxa blocks an app's own server and nothing else gets through, it
+  offers to fix it — once a week at most, never for system apps
+• Pop-up ad apps are looked for automatically once a day; you only hear
+  about it if one is found
+• Sunday evening: a short weekly summary of what Noxa blocked
+• Clearer names in your stats (Datadog, Sift, Criteo and more)

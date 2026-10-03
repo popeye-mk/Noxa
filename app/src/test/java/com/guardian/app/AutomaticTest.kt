@@ -54,3 +54,68 @@ class AutomaticTest {
         assertEquals("example.com", DnsPacket.parseQuery(p, p.size)!!.domain)
     }
 }
+
+class StepTwoTest {
+    private val t0 = 1_800_000_000_000L
+
+    @Test fun ownSiteMatching() {
+        assertTrue(StuckAppDetector.isOwnSite("com.viber.voip", "media.cdn.viber.com"))
+        assertTrue(StuckAppDetector.isOwnSite("com.disney.disneyplus", "bam.disneystreaming.com"))
+        assertTrue(StuckAppDetector.isOwnSite("nl.rabobank.android", "api.rabobank.nl"))
+        assertFalse(StuckAppDetector.isOwnSite("com.viber.voip", "doubleclick.net"))
+        assertFalse(StuckAppDetector.isOwnSite("com.example.game", "app-measurement.com"))   // "game"/"app" too generic
+        assertFalse(StuckAppDetector.isOwnSite("com.whatsapp", "w.com"))                     // too short to judge
+    }
+
+    @Test fun stuckWhenOwnServerBlockedAndNothingGotThrough() {
+        val app = "com.viber.voip"
+        assertFalse(StuckAppDetector.observe(app, "api.viber.com", LiveLog.Verdict.BLOCKED, "viber.com · Tracking", t0))
+        assertTrue(StuckAppDetector.observe(app, "api.viber.com", LiveLog.Verdict.BLOCKED, "viber.com · Tracking", t0 + 2000))
+        // once a week at most
+        assertFalse(StuckAppDetector.observe(app, "api.viber.com", LiveLog.Verdict.BLOCKED, "x", t0 + 5000))
+        assertFalse(StuckAppDetector.observe(app, "api.viber.com", LiveLog.Verdict.BLOCKED, "x", t0 + 6000))
+    }
+
+    @Test fun backgroundTrackerPingsAreNotStuck() {
+        // a game idling in the background, only reaching blocked third-party trackers
+        val app = "com.example.puzzle"
+        var fired = false
+        for (i in 0 until 10) fired = StuckAppDetector.observe(app, "events$i.adtracker.example",
+            LiveLog.Verdict.BLOCKED, "x · Tracking", t0 + i * 1000) || fired
+        assertFalse(fired)
+    }
+
+    @Test fun ownServerBlockedButAppStillWorksIsNotStuck() {
+        val app = "com.example.shopnow"
+        StuckAppDetector.observe(app, "metrics.shopnow.com", LiveLog.Verdict.BLOCKED, "x · Tracking", t0)
+        StuckAppDetector.observe(app, "api.shopnow.com", LiveLog.Verdict.ALLOWED, "", t0 + 100)
+        assertFalse(StuckAppDetector.observe(app, "metrics.shopnow.com", LiveLog.Verdict.BLOCKED, "x · Tracking", t0 + 200))
+    }
+
+    @Test fun dangerousOrUserChosenBlocksNeverTriggerAnOffer() {
+        val app = "com.example.danger"
+        var fired = false
+        for (i in 0 until 10) {
+            fired = StuckAppDetector.observe(app, "evil.example", LiveLog.Verdict.BLOCKED, "Dangerous site · Scam/malware", t0 + i) || fired
+            fired = StuckAppDetector.observe(app, "spy.example", LiveLog.Verdict.BLOCKED, "Stalkerware · Spyware", t0 + i) || fired
+            fired = StuckAppDetector.observe(app, "mine.example", LiveLog.Verdict.MINE, "On your block list", t0 + i) || fired
+            fired = StuckAppDetector.observe(app, "fw.example", LiveLog.Verdict.FIREWALL, "Whole app blocked by you", t0 + i) || fired
+        }
+        assertFalse(fired)
+        assertFalse(StuckAppDetector.observe(AppStats.UNKNOWN, "x.example", LiveLog.Verdict.BLOCKED, "x", t0))
+    }
+
+    @Test fun weeklySummaryTiming() {
+        val sun = java.util.Calendar.SUNDAY; val day = 24L * 60 * 60 * 1000
+        assertTrue(HealthMonitor.weeklyDue(sun, 19, 0L, t0))
+        assertFalse(HealthMonitor.weeklyDue(sun, 18, 0L, t0))                        // too early
+        assertFalse(HealthMonitor.weeklyDue(java.util.Calendar.MONDAY, 20, 0L, t0))  // wrong day
+        assertFalse(HealthMonitor.weeklyDue(sun, 21, t0 - day, t0))                  // already sent
+        assertTrue(HealthMonitor.weeklyDue(sun, 21, t0 - 7 * day, t0))
+    }
+
+    @Test fun newCompanyNames() {
+        assertEquals("Datadog · Monitoring", Trackers.label("browser-intake-us5-datadoghq.com"))
+        assertEquals("Sift · Fraud profiling", Trackers.label("cdn.siftscience.com"))
+    }
+}
