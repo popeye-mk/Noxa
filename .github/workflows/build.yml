@@ -2,7 +2,8 @@ name: Build APK
 
 # Builds the TEST APK ("Noxa TEST", installs side-by-side) on every push / PR
 # and runs the unit tests + packet-algorithm cross-checks. Download it from
-# the run's "Artifacts" section. Public releases: see release.yml.
+# https://github.com/popeye-mk/Noxa/raw/test-apk/noxa-TEST.apk (latest push)
+# or the run's "Artifacts" section. Public releases: see release.yml.
 on:
   push:
   pull_request:
@@ -14,6 +15,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04   # pinned: ubuntu-latest moves to Ubuntu 26 on 2026-10-19
+    permissions:
+      contents: write   # only to replace the test-apk branch (push events)
     steps:
       - uses: actions/checkout@v7
 
@@ -47,3 +50,21 @@ jobs:
           path: noxa-TEST.apk
           archive: false
           if-no-files-found: error
+
+      # Phone-friendly download, no login needed (public repo):
+      #   https://github.com/popeye-mk/Noxa/raw/test-apk/noxa-TEST.apk
+      # The test-apk branch holds ONE commit with just the latest test APK
+      # (replaced each time, so the repo doesn't grow). Never a release.
+      - name: Publish latest test APK to the test-apk branch
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          SRC: ${{ github.ref_name }}@${{ github.sha }}
+        run: |
+          mkdir "$RUNNER_TEMP/t" && cp noxa-TEST.apk "$RUNNER_TEMP/t/"
+          cd "$RUNNER_TEMP/t"
+          printf 'Latest Noxa TEST build (debug, installs next to Noxa).\nBuilt from %s\n' "$SRC" > README.txt
+          git init -q -b test-apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Test APK from $SRC"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" test-apk
