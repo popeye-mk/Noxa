@@ -47,7 +47,8 @@ class CheckupActivity : Activity() {
 
         val doh = GuardianVpnService.encryptedDns.get()
         out += Item(doh, "Encrypted DNS",
-            if (doh) "Your lookups are hidden from the Wi-Fi/ISP (via ${DnsProviders.current.name})."
+            if (doh) "Your lookups are hidden from the Wi-Fi/ISP (via ${DnsProviders.active.name})." +
+                (DnsProviders.fallbackInfo()?.let { (f, c) -> " ${c.name} wasn't answering, so ${f.name} is used for a few minutes." } ?: "")
             else "Lookups travel unencrypted — the Wi-Fi owner and ISP can read them.",
             if (doh) null else "Turn on") { GuardianVpnService.setEncryptedDns(this, true); refresh() }
 
@@ -60,10 +61,12 @@ class CheckupActivity : Activity() {
         val ui = getSharedPreferences("guardian_ui", Context.MODE_PRIVATE)
         val systemOk = pm.isIgnoringBatteryOptimizations(packageName)
         val confirmed = ui.getBoolean(KEY_BATTERY_CONFIRMED, false)
-        val battery = systemOk || confirmed
+        val proven = HealthMonitor.batteryProvenOk(this)       // v1.11: judged from real behaviour
+        val battery = systemOk || confirmed || proven
         out += Item(battery, "Allowed to run in the background",
             when {
                 systemOk -> "The battery manager won't kill protection."
+                proven -> "No unexpected stops for 3+ days — the phone lets Noxa run."
                 confirmed -> "You set Noxa to \"No restrictions\" in the phone's battery settings."
                 else -> "The phone may silently stop Noxa to save battery — the #1 cause of \"it stopped\"."
             },

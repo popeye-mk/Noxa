@@ -1,0 +1,14 @@
+Noxa looks after itself:
+• The check-up runs by itself: you get one notification only if something
+  breaks (Always-on switched off, the phone keeps stopping Noxa, the list
+  stops updating) — no need to open it to find out
+• Battery check judged by what really happens: after 3 days without an
+  unexpected stop it's marked OK automatically (works on Xiaomi too)
+• If your DNS provider stops answering, Noxa switches to the next one for
+  a few minutes by itself, then goes back to your choice
+• Fix an app that won't work: the apps Noxa just blocked something for are
+  listed first, a gentle fix (allow only what it was blocked from) comes
+  before bypassing, and changes apply instantly — no off/on
+• DNS provider: "Test speed" times each provider on your network and marks
+  the fastest
+• Shorter menu: list and app updates are fully automatic now

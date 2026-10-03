@@ -201,13 +201,15 @@ class AppsActivity : Activity() {
     }
 
     /** All the advanced controls, in one calm plain-language menu. */
-    /** v1.10.1: the everyday things only — the rest lives under "More". */
+    /** v1.11: the things people actually use. Updates (lists and app) and the
+     *  check-up happen by themselves, so they have no buttons here any more. */
     private fun showToolsMenu() {
         val items = arrayOf(
             "🛡  Protection check-up",
             "📡  Live — watch it happen",
             "✓  Allowed & blocked sites",
             "🔧  Fix an app that won't work",
+            "🌍  DNS provider (who answers lookups)",
             "🕵  Find the app behind pop-up ads",
             "🌐  Hide my IP (private tunnel)",
             "⚙  More settings…"
@@ -220,9 +222,10 @@ class AppsActivity : Activity() {
                     1 -> startActivity(Intent(this, LiveActivity::class.java))
                     2 -> showSiteLists()
                     3 -> showExcludePicker()
-                    4 -> startActivity(Intent(this, AdwareActivity::class.java))
-                    5 -> startActivity(Intent(this, TunnelActivity::class.java))
-                    6 -> showMoreMenu()
+                    4 -> showDnsProviderPicker()
+                    5 -> startActivity(Intent(this, AdwareActivity::class.java))
+                    6 -> startActivity(Intent(this, TunnelActivity::class.java))
+                    7 -> showMoreMenu()
                 }
             }
             .setNegativeButton("Close", null)
@@ -243,14 +246,11 @@ class AppsActivity : Activity() {
             .show()
     }
 
-    /** Rarely needed: set once, or done automatically anyway. */
+    /** Rarely needed: set once and forget. */
     private fun showMoreMenu() {
         ScamShield.load(this)
         val items = arrayOf(
             "🧱  Strict scam protection: " + (if (ScamShield.isOn) "ON" else "off"),
-            "🌍  DNS provider (who answers lookups)",
-            "🔄  Update protection now",
-            "⬆️  Check for a new Noxa version",
             "💾  Back up / restore my settings",
             "📄  Save my report (CSV)"
         )
@@ -259,10 +259,7 @@ class AppsActivity : Activity() {
             .setItems(items) { _, i ->
                 when (i) {
                     0 -> showStrictDialog()
-                    1 -> showDnsProviderPicker()
-                    2 -> checkForUpdate()
-                    3 -> checkAppUpdate()
-                    4 -> AlertDialog.Builder(this)
+                    1 -> AlertDialog.Builder(this)
                         .setTitle("Back up / restore")
                         .setItems(arrayOf("💾  Back up my settings to a file", "📂  Restore from a backup file")) { _, j ->
                             if (j == 0) pickFile(Intent.ACTION_CREATE_DOCUMENT, REQ_BACKUP)
@@ -270,7 +267,7 @@ class AppsActivity : Activity() {
                         }
                         .setNegativeButton("Back") { _, _ -> showMoreMenu() }
                         .show()
-                    5 -> exportCsv()
+                    2 -> exportCsv()
                 }
             }
             .setNegativeButton("Back") { _, _ -> showToolsMenu() }
@@ -336,11 +333,15 @@ class AppsActivity : Activity() {
     private fun showDnsProviderPicker() {
         DnsProviders.load(this)
         val list = DnsProviders.BUILT_IN
-        val labels = list.map { "${it.name}\n${it.blurb}" } + "Your own server…"
+        val labels = list.map { p ->
+            "${p.name}" + (dnsSpeed[p.id]?.let { if (it < 0) "  ·  no answer" else "  ·  $it ms" } ?: "") +
+                (if (p.id == dnsFastest) "  ⚡ fastest" else "") + "\n${p.blurb}"
+        } + "Your own server…"
         val cur = DnsProviders.current
         val checked = list.indexOfFirst { it.id == cur.id }.let { if (it < 0) list.size else it }
+        val fb = DnsProviders.fallbackInfo()?.let { (f, c) -> "\n${c.name} isn't answering — using ${f.name} for a few minutes (automatic)." } ?: ""
         AlertDialog.Builder(this)
-            .setTitle("Who answers allowed lookups?")
+            .setTitle("Who answers allowed lookups?$fb")
             .setSingleChoiceItems(labels.toTypedArray(), checked) { d, i ->
                 if (i < list.size) {
                     DnsProviders.select(this, list[i].id)
@@ -348,8 +349,24 @@ class AppsActivity : Activity() {
                     d.dismiss()
                 } else { d.dismiss(); showCustomDnsDialog() }
             }
+            .setNeutralButton("Test speed") { _, _ -> testDnsSpeed() }
             .setNegativeButton("Close", null)
             .show()
+    }
+
+    private val dnsSpeed = HashMap<String, Long>()     // provider id -> ms, -1 = no answer
+    private var dnsFastest: String? = null
+
+    /** v1.11: time one real lookup at each provider from THIS network and
+     *  mark the fastest (Noxa's own traffic bypasses its VPN, so this measures
+     *  the direct path). Nothing is sent but one "example.com" query each. */
+    private fun testDnsSpeed() {
+        Toast.makeText(this, "Testing… (a few seconds)", Toast.LENGTH_SHORT).show()
+        Thread {
+            for (p in DnsProviders.BUILT_IN) dnsSpeed[p.id] = DnsSpeed.measure(p.ip)
+            dnsFastest = dnsSpeed.filterValues { it >= 0 }.minByOrNull { it.value }?.key
+            runOnUiThread { showDnsProviderPicker() }
+        }.start()
     }
 
     private fun showCustomDnsDialog() {
@@ -400,23 +417,6 @@ class AppsActivity : Activity() {
             .show()
     }
 
-    private fun checkAppUpdate() {
-        Toast.makeText(this, "Checking…", Toast.LENGTH_SHORT).show()
-        Thread {
-            val msg = AppUpdater.checkNow(this@AppsActivity)
-            runOnUiThread { Toast.makeText(this@AppsActivity, msg, Toast.LENGTH_LONG).show() }
-        }.start()
-    }
-
-    private fun checkForUpdate() {
-        Toast.makeText(this, "Checking for a newer blocklist…", Toast.LENGTH_SHORT).show()
-        Thread {
-            val msg = FilterUpdater.checkAndUpdate(this@AppsActivity)
-            runOnUiThread { Toast.makeText(this@AppsActivity, msg, Toast.LENGTH_LONG).show() }
-        }.start()
-    }
-
-
     /** Tap an app -> plain-language breakdown + the "don't filter" escape hatch. */
     private fun showDetail(name: String, pkg: String) {
         val excluded = AppStats.isNoFilter(pkg)
@@ -454,24 +454,78 @@ class AppsActivity : Activity() {
             .plus(headless)
             .distinct()
             .filter { it != packageName }
-            .map { pkg -> Pair(label(pkg), pkg) }
-            .sortedBy { it.first.lowercase() }
-        val labels = launchables.map { (name, pkg) ->
-            (if (AppStats.isNoFilter(pkg)) "✓ " else "") + name
+        // v1.11: the likely culprits first — apps already excluded, then apps
+        // Noxa blocked something for in the last minutes (from the Live feed),
+        // then everything else A–Z.
+        val recent = LiveLog.recent().filter { it.verdict != LiveLog.Verdict.ALLOWED }
+            .groupingBy { it.pkg }.eachCount()
+        val apps = launchables.map { pkg -> Triple(label(pkg), pkg, recent[pkg] ?: 0) }
+            .sortedWith(compareByDescending<Triple<String, String, Int>> { AppStats.isNoFilter(it.second) }
+                .thenByDescending { it.third }.thenBy { it.first.lowercase() })
+        val labels = apps.map { (name, pkg, n) ->
+            when {
+                AppStats.isNoFilter(pkg) -> "✓ $name — bypassing Noxa"
+                n > 0 -> "$name — $n blocked just now"
+                else -> name
+            }
         }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("Which app won't work?")
-            .setItems(labels) { _, i ->
-                val (name, pkg) = launchables[i]
-                val nowOn = !AppStats.isNoFilter(pkg)
-                AppStats.setNoFilter(this, pkg, nowOn)
-                Toast.makeText(this,
-                    (if (nowOn) "$name will bypass Noxa" else "$name is filtered again") +
-                    " — turn protection off and on to apply.",
-                    Toast.LENGTH_LONG).show()
-            }
+            .setItems(labels) { _, i -> showFixOptions(apps[i].first, apps[i].second) }
             .setNegativeButton("Close", null)
             .show()
+    }
+
+    /** v1.11: the gentle fix first (allow just what that app was blocked
+     *  from), the big one second (bypass Noxa). Applied automatically. */
+    private fun showFixOptions(name: String, pkg: String) {
+        if (AppStats.isNoFilter(pkg)) {
+            AlertDialog.Builder(this)
+                .setTitle(name)
+                .setMessage("$name currently bypasses Noxa: it works, but isn't protected.")
+                .setPositiveButton("Protect it again") { _, _ ->
+                    AppStats.setNoFilter(this, pkg, false); reapplyProtection("$name is protected again.")
+                }
+                .setNegativeButton("Keep as is", null)
+                .show()
+            return
+        }
+        val blocked = LiveLog.recent()
+            .filter { it.pkg == pkg && it.verdict != LiveLog.Verdict.ALLOWED && it.verdict != LiveLog.Verdict.FIREWALL }
+            .map { it.domain }.distinct().take(15)
+        val gentle = if (blocked.isEmpty())
+            "1. Gentle: open $name, try what failed, then come back here — Noxa will show the sites it blocked so you can allow just those."
+        else "1. Gentle: allow only the ${blocked.size} site(s) Noxa blocked for it just now:\n   " + blocked.joinToString("\n   ")
+        AlertDialog.Builder(this)
+            .setTitle("Fix $name")
+            .setMessage("$gentle\n\n2. Strong: let $name bypass Noxa completely (it works, but isn't protected).")
+            .apply {
+                if (blocked.isNotEmpty()) setPositiveButton("Allow those sites") { _, _ ->
+                    blocked.forEach { AppStats.addUserAllow(this@AppsActivity, it) }
+                    Toast.makeText(this@AppsActivity, "Allowed ${blocked.size} site(s). Try $name again.", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNeutralButton("Bypass Noxa") { _, _ ->
+                AppStats.setNoFilter(this, pkg, true); reapplyProtection("$name now bypasses Noxa.")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** App exclusions only take effect when the VPN is rebuilt: do it for the
+     *  user instead of telling them to switch off and on. */
+    private fun reapplyProtection(done: String) {
+        if (!GuardianVpnService.isRunning.get() || android.net.VpnService.prepare(this) != null) {
+            Toast.makeText(this, done, Toast.LENGTH_LONG).show(); return
+        }
+        Toast.makeText(this, "$done Applying…", Toast.LENGTH_SHORT).show()
+        startService(Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP))
+        android.os.Handler(mainLooper).postDelayed({
+            val svc = Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_START)
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(svc) else startService(svc)
+            } catch (_: Exception) {}
+        }, 1500)
     }
 
     private fun exportCsv() {

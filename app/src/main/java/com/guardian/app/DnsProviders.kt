@@ -39,9 +39,50 @@ object DnsProviders {
     private const val KEY_CUSTOM_IP = "custom_ip"
     private const val KEY_CUSTOM_DOH = "custom_doh"
 
-    /** The live choice; the service reads this on every lookup (cheap). */
+    /** The user's choice. */
     @Volatile var current: Provider = BUILT_IN[0]
         private set
+
+    // v1.11 automatic fallback: if the chosen resolver stops answering, use
+    // the next one for 10 minutes, then try the user's choice again. Never
+    // changes the saved choice.
+    @Volatile private var fallback: Provider? = null
+    @Volatile private var fallbackUntil = 0L
+    @Volatile private var lastFailover = 0L
+    private const val FALLBACK_MS = 10L * 60 * 1000
+
+    /** What the service actually uses right now (the choice, or a temporary fallback). */
+    val active: Provider
+        get() {
+            val f = fallback
+            return if (f != null && System.currentTimeMillis() < fallbackUntil) f else current
+        }
+
+    /** Non-null while a fallback is in use: (fallback, the provider that failed). */
+    fun fallbackInfo(now: Long = System.currentTimeMillis()): Pair<Provider, Provider>? {
+        val f = fallback ?: return null
+        return if (now < fallbackUntil) f to current else null
+    }
+
+    /** Called by the service after several lookups in a row got no answer.
+     *  Returns the provider switched to, or null if it's too soon to switch again. */
+    fun failover(now: Long = System.currentTimeMillis()): Provider? {
+        if (now - lastFailover < 2L * 60 * 1000) return null     // at most every 2 min
+        val failing = active
+        val next = nextAfter(failing.id)
+        lastFailover = now
+        fallback = if (next.id == current.id) null else next
+        fallbackUntil = now + FALLBACK_MS
+        return next
+    }
+
+    /** Pure, unit-tested: the next built-in after [id] (a custom server falls back to the first). */
+    fun nextAfter(id: String): Provider {
+        val i = BUILT_IN.indexOfFirst { it.id == id }
+        return BUILT_IN[(i + 1) % BUILT_IN.size]
+    }
+
+    fun clearFallback() { fallback = null; fallbackUntil = 0L }
 
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -56,6 +97,7 @@ object DnsProviders {
         val prov = BUILT_IN.firstOrNull { it.id == id } ?: return
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ID, id).apply()
         current = prov
+        clearFallback()
     }
 
     /** Returns null (and changes nothing) if [ip] isn't a valid IPv4 address or
@@ -66,6 +108,7 @@ object DnsProviders {
             .putString(KEY_ID, CUSTOM_ID).putString(KEY_CUSTOM_IP, prov.ip)
             .putString(KEY_CUSTOM_DOH, prov.doh ?: "").apply()
         current = prov
+        clearFallback()
         return prov
     }
 

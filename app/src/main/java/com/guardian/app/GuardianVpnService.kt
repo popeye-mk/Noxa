@@ -71,6 +71,7 @@ class GuardianVpnService : VpnService() {
         const val ACTION_START = "com.guardian.app.START"
         const val ACTION_STOP = "com.guardian.app.STOP"
         const val ACTION_PAUSE = "com.guardian.app.PAUSE"
+        const val EXTRA_FROM_WATCHDOG = "from_watchdog"
         const val PAUSE_MS = 5L * 60 * 1000
         private const val PAUSED_NOTIF_ID = 2
         private const val CHANNEL_ID = "guardian_protection"
@@ -179,6 +180,7 @@ class GuardianVpnService : VpnService() {
     }
 
     @Volatile private var dohRetryAt = 0L   // back-off clock when DoH is failing
+    private val upstreamMisses = AtomicInteger(0)   // v1.11 automatic resolver fallback
     private val dohFailures = AtomicInteger(0)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -215,6 +217,9 @@ class GuardianVpnService : VpnService() {
             stopForeground(true); stopSelf()
             return START_NOT_STICKY
         }
+        // v1.11: a sticky restart, or a watchdog restart that isn't a planned
+        // resume, means the OS killed protection — remember it (battery check).
+        if (intent == null || intent.getBooleanExtra(EXTRA_FROM_WATCHDOG, false)) HealthMonitor.recordKill(this)
         setWantsProtection(this, true)
         // An explicit start ends any pause ("Resume now", the switch, the tile).
         // A sticky/watchdog restart while still paused stays off.
@@ -236,6 +241,7 @@ class GuardianVpnService : VpnService() {
         Threats.load(this)
         ScamShield.load(this)
         DnsProviders.load(this)
+        HealthMonitor.onProtectionStarted(this)
         if (Build.VERSION.SDK_INT >= 29) {
             try {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
@@ -518,7 +524,17 @@ class GuardianVpnService : VpnService() {
                     dohFailures.set(0)
                 }
             }
-            if (reply == null) reply = resolvePlain(payload, sock) ?: return
+            if (reply == null) reply = resolvePlain(payload, sock)
+            if (reply == null) {
+                // v1.11: the resolver isn't answering. After 3 misses in a row,
+                // switch to the next provider for 10 minutes (automatically).
+                if (upstreamMisses.incrementAndGet() >= 3) {
+                    DnsProviders.failover()?.let { Log.w(TAG, "resolver not answering — using ${it.name} for now") }
+                    upstreamMisses.set(0)
+                }
+                return
+            }
+            upstreamMisses.set(0)
 
             cache.put(job.q, reply)
             answer(job.packet, job.len, job.q, job.pkg, reply, tunOut, job.skipCname)
@@ -531,7 +547,7 @@ class GuardianVpnService : VpnService() {
      *  transaction ID matches this query: a late answer to an earlier,
      *  timed-out query can still arrive and must never reach the wrong lookup. */
     private fun resolvePlain(payload: ByteArray, sock: DatagramSocket): ByteArray? {
-        val upstream = DnsProviders.current.address
+        val upstream = DnsProviders.active.address
         sock.send(java.net.DatagramPacket(payload, payload.size, upstream, 53))
         val deadline = System.currentTimeMillis() + UPSTREAM_TIMEOUT_MS
         val buf = ByteArray(4096)
@@ -582,7 +598,7 @@ class GuardianVpnService : VpnService() {
      *  system resolver). Returns the raw DNS answer, or null on any failure
      *  (caller falls back to plain DNS at the same provider). */
     private fun resolveDoh(query: ByteArray): ByteArray? {
-        val url = DnsProviders.current.doh ?: return null
+        val url = DnsProviders.active.doh ?: return null
         return try {
             val conn = URL(url).openConnection() as HttpsURLConnection
             conn.requestMethod = "POST"
