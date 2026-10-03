@@ -33,6 +33,8 @@ class AppsActivity : Activity() {
         super.onCreate(savedInstanceState)
         AppStats.load(this)
         setContentView(buildUi())
+        // v1.11: opened from "X may not be working" — go straight to its fix.
+        intent?.getStringExtra(EXTRA_FIX_PKG)?.let { pkg -> showFixOptions(label(pkg), pkg) }
     }
 
     override fun onResume() {
@@ -540,6 +542,7 @@ class AppsActivity : Activity() {
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     companion object {
+        const val EXTRA_FIX_PKG = "fix_pkg"
         private const val REQ_BACKUP = 41
         private const val REQ_RESTORE = 42
     }

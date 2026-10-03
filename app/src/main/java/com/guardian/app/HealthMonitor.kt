@@ -88,6 +88,86 @@ object HealthMonitor {
                 "Blocklist is $age days old",
                 "Noxa couldn't download the weekly update. It keeps trying; tap to check your connection.")
         }
+
+        // 4. v1.11: once a day, quietly look for a pop-up ad app; Sunday evening, the weekly summary.
+        dailyAdwareScan(ctx, now)
+        weeklySummary(ctx, now)
+    }
+
+    // --- v1.11: weekly summary (Sunday evening) ---------------------------
+    private const val KEY_WEEKLY = "weekly_sent"
+    private const val WEEKLY_CHANNEL = "guardian_weekly"
+
+    /** Pure rule, unit-tested: Sunday 19:00 or later, and not sent in 6 days. */
+    fun weeklyDue(dayOfWeek: Int, hour: Int, lastSent: Long, now: Long): Boolean =
+        dayOfWeek == java.util.Calendar.SUNDAY && hour >= 19 && now - lastSent > 6 * DAY
+
+    fun weeklySummary(ctx: Context, now: Long = System.currentTimeMillis()) {
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = now }
+        val p = prefs(ctx)
+        if (!weeklyDue(c.get(java.util.Calendar.DAY_OF_WEEK), c.get(java.util.Calendar.HOUR_OF_DAY),
+                p.getLong(KEY_WEEKLY, 0L), now)) return
+        DailyStats.load(ctx)
+        val days = DailyStats.lastDays(7)
+        val total = days.sumOf { it.second }
+        if (total == 0L) return
+        p.edit().putLong(KEY_WEEKLY, now).apply()
+        AppStats.load(ctx)
+        val g = AppStats.globalCompanyCounts()
+        val danger = g.filterKeys { it.startsWith("Dangerous site") || it.startsWith("Stalkerware") }.values.sum()
+        val top = g.filterKeys { !it.startsWith("Dangerous") && !it.startsWith("Stalkerware") && !it.startsWith("Blocked by you") }
+            .entries.groupBy { Trackers.companyOf(it.key) }.mapValues { e -> e.value.sumOf { it.value } }
+            .maxByOrNull { it.value }?.key
+        val busiest = days.maxByOrNull { it.second }!!
+        val text = "Noxa blocked %,d tracking attempts this week".format(total) +
+            (if (top != null) " — most from $top" else "") + ". Busiest day: ${busiest.first}." +
+            (if (danger > 0) " Also stopped $danger scam/spyware connection(s) this month." else "")
+        try {
+            val mgr = ctx.getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= 26) mgr.createNotificationChannel(
+                NotificationChannel(WEEKLY_CHANNEL, "Weekly summary", NotificationManager.IMPORTANCE_LOW))
+            val open = PendingIntent.getActivity(ctx, NOTIF_BASE + 60, Intent(ctx, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE)
+            mgr.notify(NOTIF_BASE + 60, Notification.Builder(ctx, WEEKLY_CHANNEL)
+                .setContentTitle("Your week with Noxa")
+                .setContentText(text).setStyle(Notification.BigTextStyle().bigText(text))
+                .setSmallIcon(android.R.drawable.ic_lock_lock)
+                .setContentIntent(open).setAutoCancel(true).build())
+        } catch (_: Exception) {}
+    }
+
+    // --- v1.11: automatic pop-up ad check (once a day) ----------------------
+    private const val KEY_ADWARE_SCAN = "adware_scanned"
+    private const val KEY_ADWARE_TOLD = "adware_told"     // pkgs already reported
+    const val ADWARE_AUTO_THRESHOLD = 5                    // stricter than the manual screen (3)
+
+    fun dailyAdwareScan(ctx: Context, now: Long = System.currentTimeMillis()) {
+        val p = prefs(ctx)
+        if (now - p.getLong(KEY_ADWARE_SCAN, 0L) < DAY) return
+        p.edit().putLong(KEY_ADWARE_SCAN, now).apply()
+        Thread {
+            try {
+                AppStats.load(ctx)
+                val told = (p.getString(KEY_ADWARE_TOLD, "") ?: "").split(',').filter { it.isNotEmpty() }.toSet()
+                val fresh = AdwareScan.scan(ctx).filter { it.score >= ADWARE_AUTO_THRESHOLD && it.pkg !in told }
+                if (fresh.isEmpty()) return@Thread
+                p.edit().putString(KEY_ADWARE_TOLD, (told + fresh.map { it.pkg }).joinToString(",")).apply()
+                val s = fresh.first()
+                val more = if (fresh.size > 1) " (and ${fresh.size - 1} more)" else ""
+                val text = "${s.name}$more looks like it could be showing pop-up ads: " +
+                    s.reasons.take(2).joinToString("; ").lowercase() + ". Tap to see why and remove it if you don't need it."
+                val mgr = ctx.getSystemService(NotificationManager::class.java)
+                if (Build.VERSION.SDK_INT >= 26) mgr.createNotificationChannel(
+                    NotificationChannel(CHANNEL_ID, "Security alerts", NotificationManager.IMPORTANCE_HIGH))
+                val open = PendingIntent.getActivity(ctx, NOTIF_BASE + 61, Intent(ctx, AdwareActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE)
+                mgr.notify(NOTIF_BASE + 61, Notification.Builder(ctx, CHANNEL_ID)
+                    .setContentTitle("Possible pop-up ad app found")
+                    .setContentText(text).setStyle(Notification.BigTextStyle().bigText(text))
+                    .setSmallIcon(android.R.drawable.stat_sys_warning)
+                    .setContentIntent(open).setAutoCancel(true).build())
+            } catch (_: Exception) {}
+        }.start()
     }
 
     private fun batteryOkBySystem(ctx: Context): Boolean = try {

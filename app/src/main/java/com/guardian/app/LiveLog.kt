@@ -24,8 +24,12 @@ object LiveLog {
     @Volatile var version = 0L
         private set
 
+    /** v1.11: the service listens here for patterns (e.g. an app stuck on blocks). */
+    @Volatile var listener: ((Entry) -> Unit)? = null
+
     fun add(pkg: String, domain: String, verdict: Verdict, label: String = "") {
         val e = Entry(System.currentTimeMillis(), pkg, domain, verdict, label)
+        listener?.let { try { it(e) } catch (_: Exception) {} }
         synchronized(this) {
             ring[next] = e
             next = (next + 1) % CAPACITY

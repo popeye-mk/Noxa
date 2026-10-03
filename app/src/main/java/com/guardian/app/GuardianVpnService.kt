@@ -242,6 +242,10 @@ class GuardianVpnService : VpnService() {
         ScamShield.load(this)
         DnsProviders.load(this)
         HealthMonitor.onProtectionStarted(this)
+        val appCtx = applicationContext
+        LiveLog.listener = { e ->
+            if (StuckAppDetector.observe(e.pkg, e.domain, e.verdict, e.label)) StuckAppDetector.offer(appCtx, e.pkg)
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             try {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
