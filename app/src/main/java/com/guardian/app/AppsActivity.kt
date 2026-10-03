@@ -426,16 +426,25 @@ class AppsActivity : Activity() {
             "\n\n⚠ Not filtered: this app bypasses Noxa completely (it works, " +
             "but nothing is blocked or counted for it)."
         else ""
+        // v1.12: save mobile data — keep this app offline on mobile data only.
+        val dataOff = AppStats.isMobileOff(pkg)
+        val dataNote = if (dataOff)
+            "\n\n📵 Blocked on mobile data: $name only goes online on Wi-Fi."
+        else ""
         AlertDialog.Builder(this)
             .setTitle(name)
-            .setMessage(Explanations.appDetail(name, pkg) + extra)
+            .setMessage(Explanations.appDetail(name, pkg) + extra + dataNote)
             .setPositiveButton("Close", null)
+            .setNegativeButton(if (dataOff) "Allow mobile data" else "Wi-Fi only") { _, _ ->
+                AppStats.setMobileOff(this, pkg, !dataOff)
+                Toast.makeText(this,
+                    if (!dataOff) "$name now goes online on Wi-Fi only — saves your mobile data."
+                    else "$name can use mobile data again.",
+                    Toast.LENGTH_LONG).show()
+            }
             .setNeutralButton(if (excluded) "Filter this app again" else "Don't filter this app") { _, _ ->
                 AppStats.setNoFilter(this, pkg, !excluded)
-                Toast.makeText(this,
-                    (if (!excluded) "$name will bypass Noxa" else "$name is filtered again") +
-                    " — turn protection off and on to apply.",
-                    Toast.LENGTH_LONG).show()
+                reapplyProtection(if (!excluded) "$name will bypass Noxa." else "$name is filtered again.")
             }
             .show()
     }

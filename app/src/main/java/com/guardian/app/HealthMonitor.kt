@@ -92,6 +92,71 @@ object HealthMonitor {
         // 4. v1.11: once a day, quietly look for a pop-up ad app; Sunday evening, the weekly summary.
         dailyAdwareScan(ctx, now)
         weeklySummary(ctx, now)
+        newAppReport(ctx, now)
+    }
+
+    // --- v1.12: new-app report ("what did it do in its first day?") ---------
+    private const val KEY_NEWAPP_CHECK = "newapp_checked"
+    private const val KEY_NEWAPP_TOLD = "newapp_told"
+    private const val NEWAPP_CHANNEL = "guardian_newapp"
+
+    /** Pure, unit-tested: report an app once it has had a full day (and at
+     *  most 3 days), and only if it arrived after Noxa started protecting —
+     *  older apps weren't watched from their first minute. */
+    fun newAppDue(installed: Long, firstProtected: Long, now: Long): Boolean =
+        firstProtected != 0L && installed > firstProtected && now - installed in DAY until 3 * DAY
+
+    /** Pure, unit-tested: (tracking attempts, companies) from one app's
+     *  "Company · Category" counts. The user's own blocks don't count. */
+    fun trackerSummary(counts: Map<String, Long>): Pair<Long, Int> {
+        val t = counts.filterKeys { !it.startsWith("Blocked by you") }
+        return t.values.sum() to t.keys.map { Trackers.companyOf(it) }.toSet().size
+    }
+
+    fun newAppReport(ctx: Context, now: Long = System.currentTimeMillis()) {
+        val p = prefs(ctx)
+        if (now - p.getLong(KEY_NEWAPP_CHECK, 0L) < 6 * 60 * 60 * 1000L) return   // every 6 h is plenty
+        p.edit().putLong(KEY_NEWAPP_CHECK, now).apply()
+        val first = p.getLong(KEY_FIRST, 0L)
+        Thread {
+            try {
+                AppStats.load(ctx)
+                val told = (p.getString(KEY_NEWAPP_TOLD, "") ?: "").split(',').filter { it.isNotEmpty() }.toMutableSet()
+                val pm = ctx.packageManager
+                val fresh = pm.getInstalledPackages(0).filter { pi ->
+                    val ai = pi.applicationInfo ?: return@filter false
+                    pi.packageName != ctx.packageName && pi.packageName !in told &&
+                        ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0 &&
+                        newAppDue(pi.firstInstallTime, first, now)
+                }
+                for (pi in fresh) {
+                    told += pi.packageName
+                    val (n, companies) = trackerSummary(AppStats.companyCounts(pi.packageName))
+                    if (n == 0L) continue                     // a clean app: nothing to say
+                    val name = pi.applicationInfo?.loadLabel(pm)?.toString() ?: pi.packageName
+                    val top = AppStats.companyCounts(pi.packageName)
+                        .filterKeys { !it.startsWith("Blocked by you") }
+                        .entries.groupBy { Trackers.companyOf(it.key) }
+                        .mapValues { e -> e.value.sumOf { it.value } }
+                        .entries.sortedByDescending { it.value }.take(3).joinToString(", ") { it.key }
+                    val text = "In its first day, $name tried to contact trackers %,d time(s), from $companies ".format(n) +
+                        (if (companies == 1) "company" else "companies") + ": $top. Noxa blocked them all."
+                    val mgr = ctx.getSystemService(NotificationManager::class.java)
+                    if (Build.VERSION.SDK_INT >= 26) mgr.createNotificationChannel(
+                        NotificationChannel(NEWAPP_CHANNEL, "New app reports", NotificationManager.IMPORTANCE_LOW))
+                    val id = NOTIF_BASE + 70 + (pi.packageName.hashCode() and 0x1F)
+                    val open = PendingIntent.getActivity(ctx, id, Intent(ctx, AppsActivity::class.java),
+                        PendingIntent.FLAG_IMMUTABLE)
+                    mgr.notify(id, Notification.Builder(ctx, NEWAPP_CHANNEL)
+                        .setContentTitle("$name: first-day report")
+                        .setContentText(text).setStyle(Notification.BigTextStyle().bigText(text))
+                        .setSmallIcon(android.R.drawable.ic_lock_lock)
+                        .setContentIntent(open).setAutoCancel(true).build())
+                }
+                // Keep the "already told" list small: only apps still inside the window matter.
+                p.edit().putString(KEY_NEWAPP_TOLD, told.toList().takeLast(200).joinToString(",")).apply()
+            } catch (_: Exception) {}
+        }.start()
     }
 
     // --- v1.11: weekly summary (Sunday evening) ---------------------------
