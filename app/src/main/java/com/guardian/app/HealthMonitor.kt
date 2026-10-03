@@ -93,6 +93,7 @@ object HealthMonitor {
         dailyAdwareScan(ctx, now)
         weeklySummary(ctx, now)
         newAppReport(ctx, now)
+        SpyAppWatch.daily(ctx, now)                 // v1.13
     }
 
     // --- v1.12: new-app report ("what did it do in its first day?") ---------

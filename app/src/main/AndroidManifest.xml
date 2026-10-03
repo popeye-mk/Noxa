@@ -90,6 +90,26 @@
             android:name=".AdwareActivity"
             android:exported="false" />
 
+        <!-- v1.13 "Check link with Noxa": in the phone's Share menu (and the
+             text-selection menu). Offline check; nothing is sent anywhere. -->
+        <activity
+            android:name=".LinkCheckActivity"
+            android:exported="true"
+            android:label="Check link with Noxa"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- v1.5 live feed: watch lookups happen, fix a block in one tap. -->
         <activity
             android:name=".LiveActivity"

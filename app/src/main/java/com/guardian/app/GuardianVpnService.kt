@@ -609,6 +609,16 @@ class GuardianVpnService : VpnService() {
                 return
             }
 
+            // v1.13 router attack shield: a public name answering with a home /
+            // LAN address is a rebinding attack. Allowed-sites entries skip this.
+            if (!skipCname && !NetworkWatcher.loginPending && RebindShield.refuse(q.domain, reply, reply.size)) {
+                onBlocked()
+                AppStats.recordBlocked(pkg, RebindShield.LABEL)
+                LiveLog.add(pkg, q.domain, LiveLog.Verdict.BLOCKED, "⚠ Points into your home network (router attack shield)")
+                DnsPacket.buildSinkholeResponse(ipPacket, len, q)?.let { writeTun(tunOut, it) }
+                return
+            }
+
             // Genuinely allowed — return the real answer.
             allowedCount.incrementAndGet(); AppStats.recordAllowed(pkg)
             LiveLog.add(pkg, q.domain, LiveLog.Verdict.ALLOWED)

@@ -147,6 +147,35 @@ object DnsPacket {
         return out
     }
 
+    /** v1.13: every A (4-byte) and AAAA (16-byte) address in a DNS response. */
+    fun answerAddresses(p: ByteArray, len: Int): List<ByteArray> {
+        if (len < 12) return emptyList()
+        val out = ArrayList<ByteArray>()
+        val qd = u16(p, 4)
+        val an = u16(p, 6)
+        var pos = 12
+        var i = 0
+        while (i < qd) {
+            pos = skipName(p, pos, len) + 4
+            if (pos > len) return out
+            i++
+        }
+        i = 0
+        while (i < an) {
+            pos = skipName(p, pos, len)
+            if (pos + 10 > len) break
+            val type = u16(p, pos)
+            val rdlen = u16(p, pos + 8)
+            val rdStart = pos + 10
+            if (rdStart + rdlen > len) break
+            if ((type == 1 && rdlen == 4) || (type == 28 && rdlen == 16))
+                out.add(p.copyOfRange(rdStart, rdStart + rdlen))
+            pos = rdStart + rdlen
+            i++
+        }
+        return out
+    }
+
     /** Decode a (possibly compressed) domain name starting at [start]. */
     private fun readName(p: ByteArray, start: Int, len: Int): String {
         val sb = StringBuilder()
