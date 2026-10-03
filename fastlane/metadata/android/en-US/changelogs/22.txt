@@ -1,0 +1,16 @@
+Three more shields, all automatic or one tap away:
+• Check a link: long-press any link (SMS, WhatsApp, email) → Share →
+  "Check link with Noxa" → instant answer: fake PayPal/bank sites,
+  scam and spyware sites, disguised links, shortened links, risky
+  endings. Offline — the link never leaves your phone. Or copy a link and
+  tap the "Check link" Quick Settings tile (or long-press Noxa's icon)
+• Spy-app watch: once a day Noxa checks for apps that can read and
+  control your screen AND hide from uninstalling (or weren't installed
+  from an app store) — how banking trojans and stalkerware work. You
+  only hear about it if one is found
+• Router attack shield: websites can no longer point ordinary-looking
+  names at your router, camera or printer (DNS rebinding). Home names
+  (fritz.box, .local, Plex) still work; it stands aside on hotel Wi-Fi
+  until you've logged in
+Also in this update (from 1.12): public Wi-Fi guard, "Wi-Fi only" apps,
+new-app reports and big battery savings.

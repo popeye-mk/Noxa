@@ -63,6 +63,9 @@ object ScamShield {
     /** The risky ending [host] uses, or null (also null while switched off). */
     fun riskyEnding(host: String): String? = if (!on.get()) null else endingIn(endings, host)
 
+    /** v1.13 link check: the risky ending even while strict mode is off. */
+    fun riskyEndingAlways(host: String): String? = endingIn(endings, host)
+
     /** Pure, unit-tested: the ending in [set] that [host] ends with, if any.
      *  "shop.example.cam" -> "cam"; "evil.us.com" -> "us.com"; "cam" alone -> null. */
     fun endingIn(set: Set<String>, host: String): String? {
