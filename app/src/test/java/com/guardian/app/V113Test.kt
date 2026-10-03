@@ -66,6 +66,11 @@ class V113Test {
         assertEquals("https://paypa1.com/login", LinkCheck.findLink("Your account is locked https://paypa1.com/login now"))
         assertEquals("dhl-parcel.top/track", LinkCheck.findLink("Parcel waiting: dhl-parcel.top/track"))
         assertNull(LinkCheck.findLink("hello there, no link"))
+        // written without https:// — must still be caught as a disguise
+        assertEquals("paypal.com@evil.xyz", LinkCheck.findLink("paypal.com@evil.xyz"))
+        assertEquals("evil.xyz" to true, LinkCheck.hostOf("paypal.com@evil.xyz"))
+        // an ordinary e-mail address is not a disguised link
+        assertEquals("gmail.com", LinkCheck.findLink("mail john.doe@gmail.com"))
         assertEquals("paypa1.com" to false, LinkCheck.hostOf("https://PayPa1.com/login"))
         assertEquals("evil.xyz" to true, LinkCheck.hostOf("https://paypal.com@evil.xyz/x"))
         assertEquals("shop.example.com" to false, LinkCheck.hostOf("shop.example.com:8080/a?b#c"))
