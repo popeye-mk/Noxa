@@ -87,8 +87,8 @@ class TunnelActivity : Activity() {
         root.addView(muted(
             "Faster than Tor. Works with ANY WireGuard provider you trust — " +
             "Proton (free tier), Mullvad, IVPN — or your own server. Scanning a QR " +
-            "code is coming soon; for now, paste the config here and save it. " +
-            "Turning it on arrives in a later update."
+            "code is coming soon; for now, paste the config here and save it, then " +
+            "use the switch at the bottom."
         ).apply { setPadding(0, dp(4), 0, dp(10)) })
 
         input = EditText(this).apply {
@@ -145,6 +145,22 @@ class TunnelActivity : Activity() {
         }
         root.addView(wgSwitch)
 
+        // v1.12: public Wi-Fi guard — the tunnel switches itself on and off.
+        root.addView(Switch(this).apply {
+            text = "  Turn on by itself on public Wi-Fi"
+            setTextColor(Color.WHITE); textSize = 15f
+            isChecked = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(NetworkWatcher.KEY_AUTO, true)
+            setPadding(0, dp(18), 0, 0)
+            setOnCheckedChangeListener { _, on ->
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(NetworkWatcher.KEY_AUTO, on).apply()
+            }
+        })
+        root.addView(muted("On a Wi-Fi with no password, or one with a login page (hotel, airport, " +
+            "café), Noxa turns this tunnel on after you've logged in, and back off when you leave — " +
+            "then normal blocking resumes. Needs a saved config above. Noxa can't see Wi-Fi names " +
+            "(that would need your location), only whether the Wi-Fi is open.")
+            .apply { textSize = 12f; setPadding(0, dp(4), 0, dp(10)) })
+
         return ScrollView(this).apply { addView(root) }
     }
 
@@ -197,6 +213,7 @@ class TunnelActivity : Activity() {
         if (prep != null) { startActivityForResult(prep, REQ_VPN); return }
         // Only one VPN at a time — stop Guardian's blocking VPN to free the slot.
         startService(Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP))
+        NetworkWatcher.userTookOver(this)      // a tunnel the user starts is theirs, not the guard's
         val block = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_BLOCK, true)
         wgStatus.text = "Connecting…"
         Thread {
@@ -220,6 +237,7 @@ class TunnelActivity : Activity() {
 
     private fun turnTunnelOff() {
         wgStatus.text = "Turning off…"
+        NetworkWatcher.userTookOver(this)
         Thread {
             TunnelController.down(this)
             runOnUiThread { wgStatus.text = "Tunnel is off." }

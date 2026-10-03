@@ -21,7 +21,6 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import java.net.SocketTimeoutException
 import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -178,6 +177,11 @@ class GuardianVpnService : VpnService() {
                 .edit().putBoolean(KEY_WANT, on).apply()
         }
     }
+
+    @Volatile private var shownToday = -1L   // v1.12: last count drawn in the notification
+    private fun screenOn(): Boolean = try {
+        getSystemService(android.os.PowerManager::class.java).isInteractive
+    } catch (_: Exception) { true }
 
     @Volatile private var dohRetryAt = 0L   // back-off clock when DoH is failing
     private val upstreamMisses = AtomicInteger(0)   // v1.11 automatic resolver fallback
@@ -348,6 +352,14 @@ class GuardianVpnService : VpnService() {
                 if (filterReload.compareAndSet(true, false)) reloadFilterAsync()
 
                 when {
+                    AppStats.blockForData(pkg, NetworkWatcher.onMobileData) -> {
+                        // v1.12 SAVE MOBILE DATA: the user keeps this app offline
+                        // on mobile data; on Wi-Fi it works normally.
+                        onBlocked()
+                        AppStats.recordBlocked(pkg, "Blocked by you · Mobile data")
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.FIREWALL, "Blocked on mobile data (by you)")
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
+                    }
                     AppStats.isFirewalled(pkg) -> {
                         // PER-APP FIREWALL: this app is blocked entirely — sinkhole
                         // every lookup it makes, on the same pipeline as everything else.
@@ -425,10 +437,17 @@ class GuardianVpnService : VpnService() {
                 // time-based, so a busy phone doesn't rewrite storage constantly.
                 val now = System.currentTimeMillis()
                 if (now - lastFlush >= 30_000L) {
-                    saveStats(); AppStats.save(this); DailyStats.save(this)
-                    NoxaWidget.refreshAll(this)          // home-screen count stays fresh
-                    refreshNotification()                // "…N blocked today" in the shade
                     lastFlush = now
+                    // v1.12 battery: only write when something changed, and only
+                    // redraw the notification/widget when the count moved AND
+                    // the screen is on (nobody sees them otherwise).
+                    if (AppStats.dirty) { saveStats(); AppStats.save(this); DailyStats.save(this) }
+                    val today = DailyStats.today()
+                    if (today != shownToday && screenOn()) {
+                        shownToday = today
+                        NoxaWidget.refreshAll(this)          // home-screen count stays fresh
+                        refreshNotification()                // "…N blocked today" in the shade
+                    }
                 }
             }
         } finally {
@@ -492,8 +511,10 @@ class GuardianVpnService : VpnService() {
             // Interrupted = this worker belongs to a stopped session; exit even
             // if protection was already switched back on (new workers exist).
             while (running.get() && !Thread.currentThread().isInterrupted) {
-                val job = try { jobs.poll(1, TimeUnit.SECONDS) } catch (_: InterruptedException) { break }
-                    ?: continue
+                // v1.12 battery: block until work arrives. The old 1-second poll
+                // woke 4 threads 4x a second all day, even with the screen off.
+                // stopWorkers() interrupts, which ends take() cleanly.
+                val job = try { jobs.take() } catch (_: InterruptedException) { break }
                 forward(job, sock, tunOut)
             }
         } finally {
@@ -740,7 +761,10 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    override fun onCreate() { super.onCreate(); live = java.lang.ref.WeakReference(this) }
+    override fun onCreate() {
+        super.onCreate(); live = java.lang.ref.WeakReference(this)
+        NetworkWatcher.start(this)        // v1.12: mobile-data blocking + public Wi-Fi guard
+    }
 
     override fun onDestroy() { live = null; stopVpn(); super.onDestroy() }
 
