@@ -25,6 +25,7 @@ object AppStats {
     private const val KEY_COMPAT_SEEDED = "compat_seeded_v1"
     private const val KEY_NO_FILTER = "no_filter_apps"
     private const val KEY_USER_BLOCK = "user_block"
+    private const val KEY_MOBILE_OFF = "mobile_off_apps"
 
     /** Used when we can't attribute a lookup to a specific app (e.g. system). */
     const val UNKNOWN = "(system / unknown)"
@@ -43,6 +44,12 @@ object AppStats {
     private val userAllow = ConcurrentHashMap<String, Boolean>()
     /** v1.5: user's personal "always block this" list (e.g. from the Live feed). */
     private val userBlock = ConcurrentHashMap<String, Boolean>()
+    /** v1.12: apps kept offline on MOBILE DATA only (they still work on Wi-Fi). */
+    private val mobileOff = ConcurrentHashMap<String, Boolean>()
+
+    /** v1.12 battery: set when counters change, so the service skips rewriting
+     *  the same numbers to storage every 30 s while the phone is idle. */
+    @Volatile var dirty = false
 
     /** True if [host] (or a parent domain) is on the user's allowlist. */
     fun isUserAllowed(host: String): Boolean = matchesSet(userAllow, host)
@@ -98,12 +105,26 @@ object AppStats {
         save(ctx)
     }
 
+    // --- v1.12 "Save mobile data": block an app on mobile data only ---------
+    fun isMobileOff(pkg: String): Boolean = mobileOff.containsKey(pkg)
+    fun mobileOffList(): List<String> = mobileOff.keys.toList()
+    fun setMobileOff(ctx: Context, pkg: String, on: Boolean) {
+        if (on) mobileOff[pkg] = true else mobileOff.remove(pkg)
+        save(ctx)
+    }
+
+    /** Pure, unit-tested: should this lookup be stopped to save mobile data? */
+    fun blockForData(pkg: String, onMobileData: Boolean,
+                     chosen: (String) -> Boolean = ::isMobileOff): Boolean =
+        onMobileData && pkg != UNKNOWN && chosen(pkg)
+
     fun recordBlocked(pkg: String, label: String) {
+        dirty = true
         blocked.compute(pkg) { _, v -> (v ?: 0L) + 1L }
         companiesByApp.computeIfAbsent(pkg) { ConcurrentHashMap() }
             .compute(label) { _, v -> (v ?: 0L) + 1L }
     }
-    fun recordAllowed(pkg: String) { allowed.compute(pkg) { _, v -> (v ?: 0L) + 1L } }
+    fun recordAllowed(pkg: String) { dirty = true; allowed.compute(pkg) { _, v -> (v ?: 0L) + 1L } }
 
     /** The "Company · Category" -> count breakdown for one app. */
     fun companyCounts(pkg: String): Map<String, Long> = companiesByApp[pkg] ?: emptyMap()
@@ -177,6 +198,11 @@ object AppStats {
             val arr = JSONArray(p.getString(KEY_USER_BLOCK, "[]"))
             for (i in 0 until arr.length()) userBlock[arr.getString(i)] = true
         } catch (_: Exception) {}
+        mobileOff.clear()
+        try {
+            val arr = JSONArray(p.getString(KEY_MOBILE_OFF, "[]"))
+            for (i in 0 until arr.length()) mobileOff[arr.getString(i)] = true
+        } catch (_: Exception) {}
         // App-compatibility defaults — SEEDED ONCE into the user's allowlist.
         // Some apps hard-refuse to start when their startup beacon is blocked
         // (verified on real devices: Disney+ error 142 — its first-party-looking
@@ -208,6 +234,7 @@ object AppStats {
     }
 
     fun save(ctx: Context) {
+        dirty = false
         val companies = JSONObject()
         for ((app, m) in companiesByApp) {
             val inner = JSONObject()
@@ -221,6 +248,7 @@ object AppStats {
             .putString(KEY_USER_ALLOW, JSONArray(userAllow.keys.toList()).toString())
             .putString(KEY_NO_FILTER, JSONArray(noFilter.keys.toList()).toString())
             .putString(KEY_USER_BLOCK, JSONArray(userBlock.keys.toList()).toString())
+            .putString(KEY_MOBILE_OFF, JSONArray(mobileOff.keys.toList()).toString())
             .putString(KEY_COMPANIES, companies.toString())
             .apply()
     }
@@ -239,6 +267,7 @@ object AppStats {
         put("blocked_sites", JSONArray(userBlockList()))
         put("firewalled_apps", JSONArray(firewall.keys.sorted()))
         put("excluded_apps", JSONArray(noFilter.keys.sorted()))
+        put("mobile_data_blocked_apps", JSONArray(mobileOff.keys.sorted()))
         put("encrypted_dns", GuardianVpnService.encryptedDns.get())
         put("dns_provider", DnsProviders.exportValue())
     }.toString(2)
@@ -262,6 +291,7 @@ object AppStats {
         }
         for (p in strings("firewalled_apps")) if (PKG_RE.matches(p) && firewall.put(p, true) == null) apps++
         for (p in strings("excluded_apps")) if (PKG_RE.matches(p) && noFilter.put(p, true) == null) apps++
+        for (p in strings("mobile_data_blocked_apps")) if (PKG_RE.matches(p) && mobileOff.put(p, true) == null) apps++
         if (o.has("encrypted_dns")) GuardianVpnService.setEncryptedDns(ctx, o.optBoolean("encrypted_dns", true))
         o.optString("dns_provider", "").takeIf { it.isNotEmpty() }?.let { DnsProviders.importValue(ctx, it) }
         save(ctx)

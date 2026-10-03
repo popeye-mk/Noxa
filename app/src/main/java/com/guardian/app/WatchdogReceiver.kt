@@ -26,6 +26,7 @@ class WatchdogReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) schedule(ctx)
         if (!GuardianVpnService.wantsProtection(ctx)) return   // user turned it off
+        HealthMonitor.check(ctx)                                // v1.11: the check-up runs by itself
         if (GuardianVpnService.isRunning.get()) return          // alive — nothing to do
         if (GuardianVpnService.isPaused(ctx)) return            // "Pause 5 min" still running
         if (TunnelController.isUp) return   // the user's TUNNEL holds the VPN slot — never steal it
@@ -35,6 +36,9 @@ class WatchdogReceiver : BroadcastReceiver() {
         }
         val svc = Intent(ctx, GuardianVpnService::class.java)
             .setAction(GuardianVpnService.ACTION_START)
+            // A planned resume (end of "Pause 5 min", self-heal) or a reboot isn't a kill.
+            .putExtra(GuardianVpnService.EXTRA_FROM_WATCHDOG,
+                !intent.getBooleanExtra(EXTRA_RESUME, false) && intent.action != Intent.ACTION_BOOT_COMPLETED)
         try {
             if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc)
             else ctx.startService(svc)
@@ -61,6 +65,7 @@ class WatchdogReceiver : BroadcastReceiver() {
     companion object {
         private const val REQ = 1001
         private const val REQ_RESUME = 1002
+        private const val EXTRA_RESUME = "resume"
         private const val INTERVAL_MS = 15L * 60 * 1000
 
         private fun pending(ctx: Context): PendingIntent =
@@ -82,7 +87,7 @@ class WatchdogReceiver : BroadcastReceiver() {
          *  (the 15-min watchdog alone could leave it off for up to 20 min). */
         fun scheduleResume(ctx: Context, afterMs: Long, wakeup: Boolean = true) {
             val pi = PendingIntent.getBroadcast(
-                ctx, REQ_RESUME, Intent(ctx, WatchdogReceiver::class.java),
+                ctx, REQ_RESUME, Intent(ctx, WatchdogReceiver::class.java).putExtra(EXTRA_RESUME, true),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             val at = SystemClock.elapsedRealtime() + afterMs + 1000   // just past the pause
@@ -99,7 +104,7 @@ class WatchdogReceiver : BroadcastReceiver() {
             val am = ctx.getSystemService(AlarmManager::class.java)
             am.cancel(pending(ctx))
             am.cancel(PendingIntent.getBroadcast(
-                ctx, REQ_RESUME, Intent(ctx, WatchdogReceiver::class.java),
+                ctx, REQ_RESUME, Intent(ctx, WatchdogReceiver::class.java).putExtra(EXTRA_RESUME, true),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
         }
     }

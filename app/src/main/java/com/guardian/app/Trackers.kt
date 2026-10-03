@@ -142,7 +142,34 @@ object Trackers {
         "miui.com" to "Xiaomi · Analytics",
         "xiaomi.com" to "Xiaomi · Analytics",
         "xmpush.xiaomi.com" to "Xiaomi · Push/Analytics",
-        "googleapis.com" to "Google · Services"
+        "googleapis.com" to "Google · Services",
+        // v1.11: more names people actually see in their stats
+        "datadoghq.com" to "Datadog · Monitoring",
+        "datadoghq.eu" to "Datadog · Monitoring",
+        "siftscience.com" to "Sift · Fraud profiling",
+        "sift.com" to "Sift · Fraud profiling",
+        "newrelic.com" to "New Relic · Monitoring",
+        "criteo.com" to "Criteo · Advertising",
+        "criteo.net" to "Criteo · Advertising",
+        "pangle.io" to "TikTok (Pangle) · Advertising",
+        "pangleglobal.com" to "TikTok (Pangle) · Advertising",
+        "yandex.ru" to "Yandex · Analytics",
+        "mparticle.com" to "mParticle · Data/Analytics",
+        "mouseflow.com" to "Mouseflow · Session recording",
+        "optimizely.com" to "Optimizely · A/B testing",
+        "liftoff.io" to "Liftoff · Advertising",
+        "mintegral.com" to "Mintegral · Advertising",
+        "rayjump.com" to "Mintegral · Advertising",
+        "fyber.com" to "Fyber · Advertising",
+        "hotjar.io" to "Hotjar · Session recording",
+        "bugsnag.io" to "Bugsnag · Diagnostics",
+        "embrace.io" to "Embrace · Monitoring",
+        "dynatrace.com" to "Dynatrace · Monitoring",
+        "appdynamics.com" to "AppDynamics · Monitoring",
+        "airbridge.io" to "Airbridge · Attribution",
+        "clevertap-prod.com" to "CleverTap · Marketing",
+        "wzrkt.com" to "CleverTap · Marketing",
+        "iterable.com" to "Iterable · Marketing"
     )
 
     /** "Company · Category" for a blocked host; falls back to the root domain. */
@@ -153,8 +180,25 @@ object Trackers {
             MAP[probe]?.let { return it }
             probe = probe.substring(probe.indexOf('.') + 1)
         }
-        return "${rootDomain(h)} · Tracking"
+        // v1.11: some services register many hyphenated domains
+        // ("browser-intake-us5-datadoghq.com"), so an exact table misses them.
+        val root = rootDomain(h)
+        KEYWORDS.firstOrNull { (k, _) -> root.contains(k) }?.let { return it.second }
+        return "$root · Tracking"
     }
+
+    private val KEYWORDS = listOf(
+        "datadoghq" to "Datadog · Monitoring",
+        "siftscience" to "Sift · Fraud profiling",
+        "doubleclick" to "Google · Advertising",
+        "googlesyndication" to "Google · Advertising",
+        "google-analytics" to "Google · Analytics",
+        "appsflyer" to "AppsFlyer · Attribution",
+        "newrelic" to "New Relic · Monitoring",
+        "criteo" to "Criteo · Advertising",
+        "applovin" to "AppLovin · Advertising",
+        "unityads" to "Unity · Advertising",
+    )
 
     /** Just the company/name part (before the "·"), for compact summaries. */
     fun companyOf(label: String): String = label.substringBefore(" · ").trim()   // "Stalkerware · Spyware" -> "Stalkerware"

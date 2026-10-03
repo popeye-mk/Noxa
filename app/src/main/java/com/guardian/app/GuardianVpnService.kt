@@ -21,7 +21,6 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import java.net.SocketTimeoutException
 import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -71,6 +70,7 @@ class GuardianVpnService : VpnService() {
         const val ACTION_START = "com.guardian.app.START"
         const val ACTION_STOP = "com.guardian.app.STOP"
         const val ACTION_PAUSE = "com.guardian.app.PAUSE"
+        const val EXTRA_FROM_WATCHDOG = "from_watchdog"
         const val PAUSE_MS = 5L * 60 * 1000
         private const val PAUSED_NOTIF_ID = 2
         private const val CHANNEL_ID = "guardian_protection"
@@ -178,7 +178,13 @@ class GuardianVpnService : VpnService() {
         }
     }
 
+    @Volatile private var shownToday = -1L   // v1.12: last count drawn in the notification
+    private fun screenOn(): Boolean = try {
+        getSystemService(android.os.PowerManager::class.java).isInteractive
+    } catch (_: Exception) { true }
+
     @Volatile private var dohRetryAt = 0L   // back-off clock when DoH is failing
+    private val upstreamMisses = AtomicInteger(0)   // v1.11 automatic resolver fallback
     private val dohFailures = AtomicInteger(0)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -215,6 +221,9 @@ class GuardianVpnService : VpnService() {
             stopForeground(true); stopSelf()
             return START_NOT_STICKY
         }
+        // v1.11: a sticky restart, or a watchdog restart that isn't a planned
+        // resume, means the OS killed protection — remember it (battery check).
+        if (intent == null || intent.getBooleanExtra(EXTRA_FROM_WATCHDOG, false)) HealthMonitor.recordKill(this)
         setWantsProtection(this, true)
         // An explicit start ends any pause ("Resume now", the switch, the tile).
         // A sticky/watchdog restart while still paused stays off.
@@ -236,6 +245,11 @@ class GuardianVpnService : VpnService() {
         Threats.load(this)
         ScamShield.load(this)
         DnsProviders.load(this)
+        HealthMonitor.onProtectionStarted(this)
+        val appCtx = applicationContext
+        LiveLog.listener = { e ->
+            if (StuckAppDetector.observe(e.pkg, e.domain, e.verdict, e.label)) StuckAppDetector.offer(appCtx, e.pkg)
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             try {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
@@ -338,6 +352,14 @@ class GuardianVpnService : VpnService() {
                 if (filterReload.compareAndSet(true, false)) reloadFilterAsync()
 
                 when {
+                    AppStats.blockForData(pkg, NetworkWatcher.onMobileData) -> {
+                        // v1.12 SAVE MOBILE DATA: the user keeps this app offline
+                        // on mobile data; on Wi-Fi it works normally.
+                        onBlocked()
+                        AppStats.recordBlocked(pkg, "Blocked by you · Mobile data")
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.FIREWALL, "Blocked on mobile data (by you)")
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
+                    }
                     AppStats.isFirewalled(pkg) -> {
                         // PER-APP FIREWALL: this app is blocked entirely — sinkhole
                         // every lookup it makes, on the same pipeline as everything else.
@@ -415,10 +437,17 @@ class GuardianVpnService : VpnService() {
                 // time-based, so a busy phone doesn't rewrite storage constantly.
                 val now = System.currentTimeMillis()
                 if (now - lastFlush >= 30_000L) {
-                    saveStats(); AppStats.save(this); DailyStats.save(this)
-                    NoxaWidget.refreshAll(this)          // home-screen count stays fresh
-                    refreshNotification()                // "…N blocked today" in the shade
                     lastFlush = now
+                    // v1.12 battery: only write when something changed, and only
+                    // redraw the notification/widget when the count moved AND
+                    // the screen is on (nobody sees them otherwise).
+                    if (AppStats.dirty) { saveStats(); AppStats.save(this); DailyStats.save(this) }
+                    val today = DailyStats.today()
+                    if (today != shownToday && screenOn()) {
+                        shownToday = today
+                        NoxaWidget.refreshAll(this)          // home-screen count stays fresh
+                        refreshNotification()                // "…N blocked today" in the shade
+                    }
                 }
             }
         } finally {
@@ -482,8 +511,10 @@ class GuardianVpnService : VpnService() {
             // Interrupted = this worker belongs to a stopped session; exit even
             // if protection was already switched back on (new workers exist).
             while (running.get() && !Thread.currentThread().isInterrupted) {
-                val job = try { jobs.poll(1, TimeUnit.SECONDS) } catch (_: InterruptedException) { break }
-                    ?: continue
+                // v1.12 battery: block until work arrives. The old 1-second poll
+                // woke 4 threads 4x a second all day, even with the screen off.
+                // stopWorkers() interrupts, which ends take() cleanly.
+                val job = try { jobs.take() } catch (_: InterruptedException) { break }
                 forward(job, sock, tunOut)
             }
         } finally {
@@ -518,7 +549,17 @@ class GuardianVpnService : VpnService() {
                     dohFailures.set(0)
                 }
             }
-            if (reply == null) reply = resolvePlain(payload, sock) ?: return
+            if (reply == null) reply = resolvePlain(payload, sock)
+            if (reply == null) {
+                // v1.11: the resolver isn't answering. After 3 misses in a row,
+                // switch to the next provider for 10 minutes (automatically).
+                if (upstreamMisses.incrementAndGet() >= 3) {
+                    DnsProviders.failover()?.let { Log.w(TAG, "resolver not answering — using ${it.name} for now") }
+                    upstreamMisses.set(0)
+                }
+                return
+            }
+            upstreamMisses.set(0)
 
             cache.put(job.q, reply)
             answer(job.packet, job.len, job.q, job.pkg, reply, tunOut, job.skipCname)
@@ -531,7 +572,7 @@ class GuardianVpnService : VpnService() {
      *  transaction ID matches this query: a late answer to an earlier,
      *  timed-out query can still arrive and must never reach the wrong lookup. */
     private fun resolvePlain(payload: ByteArray, sock: DatagramSocket): ByteArray? {
-        val upstream = DnsProviders.current.address
+        val upstream = DnsProviders.active.address
         sock.send(java.net.DatagramPacket(payload, payload.size, upstream, 53))
         val deadline = System.currentTimeMillis() + UPSTREAM_TIMEOUT_MS
         val buf = ByteArray(4096)
@@ -568,6 +609,16 @@ class GuardianVpnService : VpnService() {
                 return
             }
 
+            // v1.13 router attack shield: a public name answering with a home /
+            // LAN address is a rebinding attack. Allowed-sites entries skip this.
+            if (!skipCname && !NetworkWatcher.loginPending && RebindShield.refuse(q.domain, reply, reply.size)) {
+                onBlocked()
+                AppStats.recordBlocked(pkg, RebindShield.LABEL)
+                LiveLog.add(pkg, q.domain, LiveLog.Verdict.BLOCKED, "⚠ Points into your home network (router attack shield)")
+                DnsPacket.buildSinkholeResponse(ipPacket, len, q)?.let { writeTun(tunOut, it) }
+                return
+            }
+
             // Genuinely allowed — return the real answer.
             allowedCount.incrementAndGet(); AppStats.recordAllowed(pkg)
             LiveLog.add(pkg, q.domain, LiveLog.Verdict.ALLOWED)
@@ -582,7 +633,7 @@ class GuardianVpnService : VpnService() {
      *  system resolver). Returns the raw DNS answer, or null on any failure
      *  (caller falls back to plain DNS at the same provider). */
     private fun resolveDoh(query: ByteArray): ByteArray? {
-        val url = DnsProviders.current.doh ?: return null
+        val url = DnsProviders.active.doh ?: return null
         return try {
             val conn = URL(url).openConnection() as HttpsURLConnection
             conn.requestMethod = "POST"
@@ -720,7 +771,10 @@ class GuardianVpnService : VpnService() {
         }
     }
 
-    override fun onCreate() { super.onCreate(); live = java.lang.ref.WeakReference(this) }
+    override fun onCreate() {
+        super.onCreate(); live = java.lang.ref.WeakReference(this)
+        NetworkWatcher.start(this)        // v1.12: mobile-data blocking + public Wi-Fi guard
+    }
 
     override fun onDestroy() { live = null; stopVpn(); super.onDestroy() }
 
