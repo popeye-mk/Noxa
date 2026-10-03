@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        addLinkCheckShortcut()
         toggle = findViewById(R.id.toggle)
         status = findViewById(R.id.status)
         counter = findViewById(R.id.counter)
@@ -211,5 +212,21 @@ class MainActivity : Activity() {
         counter.text = getString(R.string.blocked_count, maxOf(live, saved))
         week.setDays(DailyStats.lastDays(7))
         ui.postDelayed({ tick() }, 1000)
+    }
+
+    /** v1.13: long-press Noxa's icon → "Check copied link". */
+    private fun addLinkCheckShortcut() {
+        if (android.os.Build.VERSION.SDK_INT < 25) return
+        try {
+            val sm = getSystemService(android.content.pm.ShortcutManager::class.java) ?: return
+            val sc = android.content.pm.ShortcutInfo.Builder(this, "check_link")
+                .setShortLabel("Check copied link")
+                .setLongLabel("Check copied link")
+                .setIcon(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_tile_shield))
+                .setIntent(Intent(this, LinkCheckActivity::class.java)
+                    .setAction(LinkCheckActivity.ACTION_CHECK_CLIPBOARD))
+                .build()
+            sm.dynamicShortcuts = listOf(sc)
+        } catch (_: Exception) {}
     }
 }

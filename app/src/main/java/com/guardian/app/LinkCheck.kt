@@ -13,16 +13,20 @@ object LinkCheck {
     class Result(val host: String, val level: Level, val title: String, val detail: String)
 
     private val URL_RE = Regex("""(?i)\b(?:https?://|www\.)[^\s<>"']+""")
-    private val BARE_RE = Regex("""(?i)\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\.[a-z][a-z0-9-]{1,62}(?:/[^\s<>"']*)?""")
+    private val BARE_RE = Regex("""(?i)\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\.[a-z][a-z0-9-]{1,62}(?![@a-z0-9.-])(?:/[^\s<>"']*)?""")
 
     val SHORTENERS = setOf(
         "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly", "cutt.ly",
         "rb.gy", "shorturl.at", "tiny.cc", "rebrand.ly", "s.id", "t.ly", "lnkd.in", "v.gd",
         "shorturl.gg", "qrco.de", "u.to", "clck.ru")
 
+    /** "paypal.com@evil.xyz" written without https:// — a website name before
+     *  the @ (an ordinary e-mail like john.doe@gmail.com doesn't match). */
+    private val DISGUISE_RE = Regex("""(?i)\b[a-z0-9.-]+\.(?:com|net|org|info|biz|io|co|uk|de|be|nl|fr|it|es|eu|ru|app|gov|edu|me|us|ca|au|ch|at|pl)@[a-z0-9.-]+\.[a-z]{2,}[^\s<>"']*""")
+
     /** Pure, unit-tested: the first link in a shared text, or null. */
     fun findLink(text: String): String? =
-        URL_RE.find(text)?.value ?: BARE_RE.find(text)?.value
+        URL_RE.find(text)?.value ?: DISGUISE_RE.find(text)?.value ?: BARE_RE.find(text)?.value
 
     /** Pure, unit-tested: the REAL host of a link. "https://paypal.com@evil.xyz/x"
      *  goes to evil.xyz — the part before @ is a disguise. Returns (host, disguised). */
