@@ -105,6 +105,12 @@ object FakeSites {
         "nsatc.net",   // Microsoft's own server network (*.microsoft.com.nsatc.net)
     )
 
+    /** v1.13.1: a brand's OWN sites whose name looks like a fake of it.
+     *  Exact site only — "disney-plus.xyz" is still caught. */
+    private val REAL_SITES = setOf(
+        "disney-plus.net",   // Disney+'s real image/config servers (false alarm on Disney+ start)
+    )
+
     /** Real names that happen to look like a brand (i reads as l). */
     private val KNOWN_REAL = setOf(
         "appie",     // Albert Heijn's app (NL), not Apple
@@ -166,7 +172,8 @@ object FakeSites {
         if (ri < 0) return null
         val reg = labels[ri]
         if (reg in byLabel || reg in KNOWN_REAL) return null   // the real name, under any ending
-        if (labels.subList(ri, labels.size).joinToString(".") in CDN_SITES) return null
+        val site = labels.subList(ri, labels.size).joinToString(".")
+        if (site in CDN_SITES || site in REAL_SITES) return null
 
         // A: the site's own name is a look-alike of a brand.
         bySkeleton[skeleton(unicode(reg))]?.let { return it }

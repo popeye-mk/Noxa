@@ -1,0 +1,5 @@
+Fix: Disney+ was wrongly flagged as a "fake Disney+ site" when it started.
+disney-plus.net is Disney's own server for images and settings; Noxa now
+recognises it (look-alikes such as disney-plus.xyz are still blocked).
+Includes everything from 1.13: link check, spy-app watch, router attack
+shield, public Wi-Fi guard, "Wi-Fi only" apps and battery savings.
