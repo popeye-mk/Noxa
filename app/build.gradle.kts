@@ -23,8 +23,8 @@ android {
         applicationId = "com.guardian.app"
         minSdk = 24            // Android 7.0 — covers ~99% of devices
         targetSdk = 34
-        versionCode = 22
-        versionName = "1.13"
+        versionCode = 23
+        versionName = "1.13.1"
     }
 
     signingConfigs {

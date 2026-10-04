@@ -143,4 +143,14 @@ class ScamProtectionTest {
         for (h in listOf("paypa1.com", "wa1mart.com", "icloud.com.verify-id.top", "netflix-billing-update.com"))
             assertNotNull(h, FakeSites.lookalikeOf(h))
     }
+
+    @Test fun disneyPlusOwnServersAreNotFake() {
+        // Disney+ loads images/config from disney-plus.net — v1.13 flagged it on start.
+        for (h in listOf("disney-plus.net", "prod-ripcut-delivery.disney-plus.net", "appconfigs.disney-plus.net",
+                         "disneyplus.com", "disneyplus.bn5x.net", "disney.api.edge.bamgrid.com"))
+            org.junit.Assert.assertNull(h, FakeSites.lookalikeOf(h))
+        // ...but a look-alike on another ending is still caught.
+        org.junit.Assert.assertNotNull(FakeSites.lookalikeOf("disney-plus.xyz"))
+        org.junit.Assert.assertNotNull(FakeSites.lookalikeOf("disneyplus-login.com"))
+    }
 }
