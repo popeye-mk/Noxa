@@ -1,13 +1,9 @@
 Smarter, lighter, more automatic:
-• Public Wi-Fi guard: on a Wi-Fi with no password or a login page
-  (hotel, airport, café), your "Hide my IP" tunnel turns on by itself
-  after you log in, and off again when you leave. Only if you've saved
-  a tunnel config; can be switched off in Hide my IP
-• Save mobile data: tap an app → "Wi-Fi only" keeps it offline on mobile
-  data; on Wi-Fi it works normally
-• New-app report: a day after you install an app, one quiet note says how
-  many trackers it tried to contact and from which companies
-• Battery: Noxa's helper threads now sleep until there's work (before,
-  they woke several times a second all day), and the notification and
-  widget only redraw when the count changes and the screen is on
-• "Don't filter this app" applies instantly, no off/on
+• Public Wi-Fi guard: on open or login-page Wi-Fi your "Hide my IP"
+  tunnel turns on after login and off when you leave (needs a saved
+  tunnel config)
+• "Wi-Fi only" apps: keep an app offline on mobile data
+• New-app report a day after you install an app
+• Battery: helper threads sleep until there's work; notification and
+  widget redraw only when needed
+• "Don't filter this app" applies instantly

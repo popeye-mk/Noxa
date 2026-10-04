@@ -129,6 +129,11 @@ Notes for the F-Droid reviewers (also useful in the RFP text):
 - `app/debug.keystore` is a PUBLIC, test-only key (password "android") for the
   `.test` debug variant, so CI test builds install over each other. Release
   builds never use it.
+- `dependenciesInfo { includeInApk = false }` (added after v1.13.1): no Google
+  dependency-metadata block in the APK signature, so F-Droid's scanner
+  doesn't flag it.
+- Changelogs (`fastlane/.../changelogs/*.txt`) stay at or under 500
+  characters — F-Droid's limit.
 - The compiled blocklist (`guardian-default.gbf`) is a build artifact of
   `build-tools/build_blocklist.py` over public lists; committed so the app
   builds offline.

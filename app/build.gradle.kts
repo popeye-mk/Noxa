@@ -66,6 +66,12 @@ android {
             }
         }
     }
+    // F-Droid: don't embed Google's encrypted dependency-metadata block in
+    // the APK signature (F-Droid's scanner rejects it; it only serves Play).
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

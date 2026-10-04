@@ -1,20 +1,9 @@
 Noxa looks after itself:
-• The check-up runs by itself: you get one notification only if something
-  breaks (Always-on switched off, the phone keeps stopping Noxa, the list
-  stops updating) — no need to open it to find out
-• Battery check judged by what really happens: after 3 days without an
-  unexpected stop it's marked OK automatically (works on Xiaomi too)
-• If your DNS provider stops answering, Noxa switches to the next one for
-  a few minutes by itself, then goes back to your choice
-• Fix an app that won't work: the apps Noxa just blocked something for are
-  listed first, a gentle fix (allow only what it was blocked from) comes
-  before bypassing, and changes apply instantly — no off/on
-• DNS provider: "Test speed" times each provider on your network and marks
-  the fastest
-• Shorter menu: list and app updates are fully automatic now
-• If Noxa blocks an app's own server and nothing else gets through, it
-  offers to fix it — once a week at most, never for system apps
-• Pop-up ad apps are looked for automatically once a day; you only hear
-  about it if one is found
-• Sunday evening: a short weekly summary of what Noxa blocked
-• Clearer names in your stats (Datadog, Sift, Criteo and more)
+• The check-up runs by itself and only notifies when something breaks
+• Battery marked OK after 3 days without an unexpected stop
+• If your DNS provider stops answering, Noxa uses the next one for a while
+• Fix an app: likely apps first, gentle fix first, applies instantly
+• DNS speed test
+• Offers a fix if an app's own server is blocked (max once a week)
+• Daily pop-up ad app check, weekly summary on Sunday
+• Clearer names in your stats
