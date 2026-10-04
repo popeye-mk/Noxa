@@ -1,10 +1,7 @@
 Under the hood, for the long run:
-• The notification now shows how many tracking attempts were blocked
-  today — no need to open the app
-• Ad-block test coverage: 100% of the hosts checked by
-  adblock.turtlecute.org (was 99.2%); the weekly list rebuild refuses
-  any update that would lower it
-• Fixed 71 shared services wrongly blocked by an over-broad rule
-  (CloudFront, imgur, t.co, Firebase and others)
-• Modern build toolchain (Gradle 9.8, Android Gradle Plugin 9.3,
-  Kotlin 2.3) and automated tests that run on every change
+• Notification shows trackers blocked today
+• Ad-block test: 100% of adblock.turtlecute.org hosts (was 99.2%); the
+  weekly rebuild refuses updates that lower it
+• Fixed 71 shared services wrongly blocked (CloudFront, imgur, t.co,
+  Firebase and others)
+• Modern toolchain (Gradle 9.8, AGP 9.3, Kotlin 2.3) and automated tests
