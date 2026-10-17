@@ -70,11 +70,14 @@ class AllowlistActivity : Activity() {
             setOnClickListener {
                 val d = field.text.toString()
                 if (d.isNotBlank()) {
-                    if (blockMode) AppStats.addUserBlock(this@AllowlistActivity, d)
-                    else AppStats.addUserAllow(this@AllowlistActivity, d)
-                    field.setText("")
-                    Toast.makeText(this@AllowlistActivity, "Added.", Toast.LENGTH_SHORT).show()
-                    setContentView(buildUi())
+                    val add = {
+                        if (blockMode) AppStats.addUserBlock(this@AllowlistActivity, d)
+                        else AppStats.addUserAllow(this@AllowlistActivity, d)
+                        field.setText("")
+                        Toast.makeText(this@AllowlistActivity, "Added.", Toast.LENGTH_SHORT).show()
+                        setContentView(buildUi())
+                    }
+                    if (blockMode) add() else ParentLock.gate(this@AllowlistActivity, "allow a site", action = add)
                 }
             }
         })
@@ -96,10 +99,14 @@ class AllowlistActivity : Activity() {
                 isFocusable = true
                 setBackgroundResource(R.drawable.row_focus)
                 setOnClickListener {
-                    if (blockMode) AppStats.removeUserBlock(this@AllowlistActivity, d)
-                    else AppStats.removeUserAllow(this@AllowlistActivity, d)
-                    Toast.makeText(this@AllowlistActivity, "Removed.", Toast.LENGTH_SHORT).show()
-                    setContentView(buildUi())
+                    val remove = {
+                        if (blockMode) AppStats.removeUserBlock(this@AllowlistActivity, d)
+                        else AppStats.removeUserAllow(this@AllowlistActivity, d)
+                        Toast.makeText(this@AllowlistActivity, "Removed.", Toast.LENGTH_SHORT).show()
+                        setContentView(buildUi())
+                    }
+                    // taking a site OFF the block list weakens protection; allowing less does not
+                    if (blockMode) ParentLock.gate(this@AllowlistActivity, "stop blocking $d", action = remove) else remove()
                 }
             })
         }

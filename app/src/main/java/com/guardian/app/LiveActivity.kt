@@ -138,8 +138,10 @@ class LiveActivity : Activity() {
                 options += "✓  Stop blocking ${e.domain}" to {
                     // Remove whichever entry on the user's list covers it.
                     val hit = AppStats.userBlockList().firstOrNull { e.domain == it || e.domain.endsWith(".$it") }
-                    if (hit != null) AppStats.removeUserBlock(this, hit)
-                    toast("Unblocked ${hit ?: e.domain}. Reload the app or page.")
+                    ParentLock.gate(this, "stop blocking ${hit ?: e.domain}", action = {
+                        if (hit != null) AppStats.removeUserBlock(this, hit)
+                        toast("Unblocked ${hit ?: e.domain}. Reload the app or page.")
+                    })
                 }
             }
             LiveLog.Verdict.FIREWALL -> {
@@ -171,8 +173,10 @@ class LiveActivity : Activity() {
     }
 
     private fun allow(d: String) {
-        AppStats.addUserAllow(this, d)
-        toast("Allowed $d. Reload the app or page.")
+        ParentLock.gate(this, "allow $d", action = {
+            AppStats.addUserAllow(this, d)
+            toast("Allowed $d. Reload the app or page.")
+        })
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()

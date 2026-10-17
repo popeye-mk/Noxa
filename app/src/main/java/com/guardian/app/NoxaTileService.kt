@@ -34,6 +34,7 @@ class NoxaTileService : TileService() {
         when {
             // Tunnel mode or no VPN permission yet: the app explains and asks.
             TunnelController.isUp || VpnService.prepare(this) != null -> openApp()
+            GuardianVpnService.isRunning.get() && ParentLock.isOn(this) -> openApp()   // v1.14: the app asks the PIN
             GuardianVpnService.isRunning.get() -> {
                 startService(Intent(this, GuardianVpnService::class.java)
                     .setAction(GuardianVpnService.ACTION_STOP))

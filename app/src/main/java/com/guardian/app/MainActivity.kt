@@ -33,14 +33,25 @@ class MainActivity : Activity() {
     private val toggleListener = CompoundButton.OnCheckedChangeListener { _, checked ->
         if (checked) {
             requestStart()
-        } else if (TunnelController.isUp) {
-            // Protected by the tunnel — turning the master switch off stops it.
-            status.text = getString(R.string.off)
-            status.setTextColor(android.graphics.Color.parseColor("#8FA0BC"))
-            Thread { TunnelController.down(this@MainActivity) }.start()
         } else {
-            stopService()
+            // v1.14 parent lock: switching off asks the PIN first; cancelled = the switch stays on.
+            ParentLock.gate(this, "turn protection off", onCancel = { syncSwitch(true) }) {
+                if (TunnelController.isUp) {
+                    // Protected by the tunnel — turning the master switch off stops it.
+                    status.text = getString(R.string.off)
+                    status.setTextColor(android.graphics.Color.parseColor("#8FA0BC"))
+                    Thread { TunnelController.down(this@MainActivity) }.start()
+                } else {
+                    stopService()
+                }
+            }
         }
+    }
+
+    private fun syncSwitch(on: Boolean) {
+        toggle.setOnCheckedChangeListener(null)
+        toggle.isChecked = on
+        toggle.setOnCheckedChangeListener(toggleListener)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -198,7 +209,8 @@ class MainActivity : Activity() {
 
     private fun stopService() {
         startService(Intent(this, GuardianVpnService::class.java)
-            .setAction(GuardianVpnService.ACTION_STOP))
+            .setAction(GuardianVpnService.ACTION_STOP)
+            .putExtra(ParentLock.EXTRA_UNLOCKED, true))        // the PIN was checked by the gate
         status.text = getString(R.string.off)
     }
 

@@ -212,7 +212,8 @@ class TunnelActivity : Activity() {
         val prep = VpnService.prepare(this)
         if (prep != null) { startActivityForResult(prep, REQ_VPN); return }
         // Only one VPN at a time — stop Guardian's blocking VPN to free the slot.
-        startService(Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP))
+        startService(Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP)
+            .putExtra(ParentLock.EXTRA_UNLOCKED, true))         // the tunnel takes over: still protected
         NetworkWatcher.userTookOver(this)      // a tunnel the user starts is theirs, not the guard's
         val block = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_BLOCK, true)
         wgStatus.text = "Connecting…"
