@@ -61,6 +61,23 @@ report once an hour.
 keep them — the live feed is memory only), allowed lookups, the list of
 installed apps, or anything about who uses the device.
 
+## Finding the server and joining — no typing (optional for a server)
+
+Typing a key on a TV remote is no fun, so Noxa can find the server and ask for its own key:
+
+1. Noxa sends one UDP broadcast on the Wi-Fi to port **8791**: the text `NOXA-HOME?`.
+2. A server answers (unicast, to the sender) with `NOXA-HOME 192.168.1.20:8790` — its own address.
+   Noxa only accepts an answer from a private address.
+3. Noxa posts to `/api/home/join`:
+   `{"format": "noxa-home-join", "device": {"id": "...", "name": "TV", "model": "..."}}` (no key header).
+4. While the server's **door is open** (the parent opened it in the server's app, say for 10 minutes) it
+   answers `{"ok": true, "key": "home-...", "message": "..."}` — a key for *that device*, shown once.
+   Noxa saves the address and the key and switches the report on. When the door is closed the server answers
+   403 with a plain message, and nothing happens.
+
+A server that doesn't support this simply doesn't answer the broadcast; the user types the address and the
+shared key instead. Per-device keys are better anyway: forgetting a device kills only its key.
+
 ## A 30-line server (Python 3, nothing to install)
 
 Save as `home-server.py` on any computer or Raspberry Pi on your Wi-Fi, run

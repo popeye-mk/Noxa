@@ -51,6 +51,13 @@ class HomeActivity : Activity() {
             "If a parent set this up: the home server sees counts and warnings, never what you looked at."
         ).apply { setPadding(0, dp(6), 0, dp(18)) })
 
+        col.addView(Button(this).apply {
+            text = "Find my home server and join (no typing)"
+            setBackgroundResource(R.drawable.btn_primary); setTextColor(Color.WHITE)
+            setOnClickListener { findAndJoin() }
+        })
+        col.addView(muted("Ask the parent to open the door in the home server's app first (10 minutes). Or fill in the " +
+            "address and key by hand below.").apply { setPadding(0, dp(6), 0, dp(10)) })
         col.addView(label("Home server address"))
         address = field("192.168.1.20  (or 192.168.1.20:8790)", HomeReport.address(this), InputType.TYPE_CLASS_TEXT)
         col.addView(address)
@@ -109,6 +116,25 @@ class HomeActivity : Activity() {
         HomeReport.save(this, a, k, name.text.toString())
         Toast.makeText(this, "Saved — only on this device.", Toast.LENGTH_SHORT).show()
         return true
+    }
+
+    private fun findAndJoin() {
+        status.text = "Looking for a home server on this Wi-Fi…"
+        Thread {
+            val addr = HomeReport.discover()
+            val result = if (addr == null) "No home server answered on this Wi-Fi. Is it on, and is its door open? You can also type the address below."
+                         else HomeReport.join(this, addr)
+            runOnUiThread {
+                address.setText(HomeReport.address(this)); key.setText(HomeReport.key(this))
+                onSwitch.setOnCheckedChangeListener(null); onSwitch.isChecked = HomeReport.isOn(this)
+                onSwitch.setOnCheckedChangeListener { _, on ->
+                    if (on && !save()) { onSwitch.isChecked = false; return@setOnCheckedChangeListener }
+                    HomeReport.setOn(this, on); if (on) sendNow() else showStatus()
+                }
+                status.text = result
+                if (result.startsWith("Joined")) sendNow()
+            }
+        }.start()
     }
 
     private fun sendNow() {
