@@ -115,3 +115,19 @@ class HomeReportTest {
         assertTrue(JSONObject(HomeReport.bodyOf("HTTP/1.0 200 OK\r\n\r\n{\"ok\": true}")).getBoolean("ok"))
     }
 }
+
+class HomeJoinTest {
+    @Test fun theServersAnswerIsOnlyAcceptedWhenItIsAHomeAddress() {
+        assertEquals("192.168.1.20:8790", HomeReport.parseDiscovery("NOXA-HOME 192.168.1.20:8790\n"))
+        assertEquals("10.0.0.5:9000", HomeReport.parseDiscovery("NOXA-HOME 10.0.0.5:9000"))
+        for (bad in listOf("NOXA-HOME 8.8.8.8:8790", "NOXA-HOME evil.example:8790", "HELLO", "", "NOXA-HOME?"))
+            assertNull(bad, HomeReport.parseDiscovery(bad))
+    }
+
+    @Test fun theJoinRequestCarriesNoKeyAndGoesToTheJoinPath() {
+        val req = String(HomeReport.request("192.168.1.20", 8790, "", "{}".toByteArray(), HomeReport.JOIN_PATH), Charsets.ISO_8859_1)
+        assertTrue(req.startsWith("POST /api/home/join HTTP/1.1\r\n"))
+        assertFalse(req.contains(HomeReport.HEADER))
+        assertTrue(req.endsWith("\r\n\r\n{}"))
+    }
+}

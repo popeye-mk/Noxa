@@ -52,6 +52,8 @@ object HomeReport {
 
     const val DEFAULT_PORT = 8790
     const val PATH = "/api/home/report"
+    const val JOIN_PATH = "/api/home/join"
+    const val DISCOVERY_PORT = 8791
     const val HEADER = "X-Home-Key"
     const val INTERVAL_MS = 60L * 60 * 1000          // one report an hour
     const val MIN_TRY_GAP_MS = 10L * 60 * 1000       // after a failure: not again within 10 min
@@ -191,11 +193,11 @@ object HomeReport {
     private fun apps(list: List<App>) =
         JSONArray(list.take(5).map { JSONArray(listOf(it.name.take(40), it.count, it.browser)) })
 
-    /** The HTTP request bytes (HTTP/1.1, one shot, connection closed by the server). */
-    fun request(host: String, port: Int, key: String, body: ByteArray): ByteArray {
-        val head = "POST $PATH HTTP/1.1\r\nHost: $host:$port\r\nUser-Agent: Noxa\r\n" +
-            "Content-Type: application/json\r\n$HEADER: $key\r\nContent-Length: ${body.size}\r\n" +
-            "Connection: close\r\n\r\n"
+    /** The HTTP request bytes (HTTP/1.1, one shot, connection closed by the server). No key = no key header. */
+    fun request(host: String, port: Int, key: String, body: ByteArray, path: String = PATH): ByteArray {
+        val head = "POST $path HTTP/1.1\r\nHost: $host:$port\r\nUser-Agent: Noxa\r\n" +
+            "Content-Type: application/json\r\n" + (if (key.isEmpty()) "" else "$HEADER: $key\r\n") +
+            "Content-Length: ${body.size}\r\nConnection: close\r\n\r\n"
         return head.toByteArray(Charsets.ISO_8859_1) + body
     }
 
@@ -204,6 +206,61 @@ object HomeReport {
         Regex("^HTTP/1\\.[01] (\\d{3})").find(reply)?.groupValues?.get(1)?.toInt() ?: -1
 
     fun bodyOf(reply: String): String = reply.substringAfter("\r\n\r\n", "")
+
+    // --- finding the server and joining (no typing) ------------------------------
+    /** Pure: "NOXA-HOME 192.168.1.20:8790" → the address, when it is a home address. */
+    fun parseDiscovery(text: String): String? {
+        val t = text.trim()
+        if (!t.startsWith("NOXA-HOME ")) return null
+        val addr = t.removePrefix("NOXA-HOME ").trim()
+        return if (parseAddress(addr) != null) addr else null
+    }
+
+    /** One broadcast on the Wi-Fi ("NOXA-HOME?"); the first home server that answers from a private address.
+     *  MUST be called off the main thread. */
+    fun discover(timeoutMs: Int = 2500): String? {
+        val sock = try { java.net.DatagramSocket() } catch (e: Exception) { return null }
+        try {
+            sock.broadcast = true
+            sock.soTimeout = timeoutMs
+            val q = "NOXA-HOME?".toByteArray(Charsets.US_ASCII)
+            sock.send(java.net.DatagramPacket(q, q.size, InetAddress.getByName("255.255.255.255"), DISCOVERY_PORT))
+            val buf = ByteArray(256)
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                val p = java.net.DatagramPacket(buf, buf.size)
+                try { sock.receive(p) } catch (_: java.net.SocketTimeoutException) { return null }
+                val addr = parseDiscovery(String(p.data, 0, p.length, Charsets.US_ASCII))
+                if (addr != null && RebindShield.isPrivate(p.address.address)) return addr
+            }
+            return null
+        } catch (e: Exception) { Log.w(TAG, "discover: $e"); return null } finally { sock.close() }
+    }
+
+    /** Ask the home server at [address] for this device's own key — works while the parent's door is open.
+     *  Saves the address and the key and switches the report on. Returns plain words. Off the main thread. */
+    fun join(ctx: Context, address: String): String {
+        val target = parseAddress(address) ?: return "That isn't a home address."
+        if (TunnelController.isUp) return "Not now: the private tunnel is on."
+        if (!onHomeNetwork(ctx)) return "Not on Wi-Fi."
+        val body = JSONObject().apply {
+            put("format", "noxa-home-join")
+            put("device", JSONObject().apply { put("id", id(ctx)); put("name", name(ctx).take(40)); put("model", (Build.MODEL ?: "").take(40)) })
+        }.toString().toByteArray(Charsets.UTF_8)
+        val reply = try { exchange(target, request(target.host, target.port, "", body, JOIN_PATH)) }
+            catch (e: Exception) { return "No answer from ${target.host}:${target.port} — is the home server on?" }
+        val json = try { JSONObject(bodyOf(reply)) } catch (_: Exception) { JSONObject() }
+        return when (statusOf(reply)) {
+            200 -> {
+                val key = json.optString("key")
+                if (!keyOk(key)) "The home server answered, but without a usable key."
+                else { save(ctx, address, key, name(ctx)); setOn(ctx, true); "Joined. " + json.optString("message") }
+            }
+            403 -> json.optString("message").ifBlank { "The door is closed — open it in the home server's app first." }
+            -1 -> "Something at ${target.host}:${target.port} answered, but not a home server."
+            else -> "The home server answered with error ${statusOf(reply)}."
+        }
+    }
 
     // --- doing it --------------------------------------------------------------
     /** Called by the watchdog every ~15 min and at each protection start. */
