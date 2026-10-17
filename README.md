@@ -39,7 +39,7 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Dangerous-site alert** — ~260,000 known scam, phishing and malware domains are flagged separately: when a browser hits one, Noxa blocks it *and* says why ("don't enter passwords there"); a non-browser app doing it gets a stronger warning.
 - **Protection check-up** — one screen listing what keeps you protected (battery exemption, Always-on VPN, alerts, encryption, list age) with a one-tap fix for each.
 - **Spyware alert** — if any app tries to contact a known stalkerware server (~525 domains, refreshed weekly), Noxa blocks it *and* warns you, naming the app.
-- **Update notice** — a once-a-day anonymous check of this repo's Releases page; a notification links to the download page. Noxa never installs anything by itself.
+- **Update notice, one tap** — a once-a-day anonymous check of this repo's Releases page. Tap the notification and Noxa downloads the new version, checks it against the SHA-256 published with the release, and opens Android's installer: you tap Install. Noxa never installs anything by itself.
 - **Home-screen widget + 7-day chart** — status, blocked-today and an on/off button on your home screen; a week of blocked trackers at a glance.
 - **Fresh lists every week** — a GitHub Action rebuilds the filter from every source each Monday and ships it only if strict safety checks pass (no false negatives, no blocked banks/connectivity/messaging apps, no suspicious size swings). Phones pick it up by themselves.
 - **Backup & restore** — save your allowed/blocked sites and app settings to a file, restore them on a new phone.

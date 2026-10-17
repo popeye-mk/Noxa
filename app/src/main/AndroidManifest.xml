@@ -20,6 +20,9 @@
          device (Noxa has no server). Also lets per-app stats name such apps. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <!-- v1.14 one-tap update: lets Noxa hand a downloaded, SHA-256-checked release APK to Android's own
+         installer. Android still asks the user to tap Install; nothing installs by itself. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android TV support: TVs are among the most tracker-infested devices
          people own (ACR, ad platforms, telemetry in every streaming app) and
@@ -74,6 +77,13 @@
         <activity
             android:name=".TunnelActivity"
             android:exported="false" />
+
+        <!-- v1.14 one-tap update: download, check, open the installer. -->
+        <activity
+            android:name=".UpdateActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- v1.14 "Report to my home server" — off by default, one tap deeper. -->
         <activity

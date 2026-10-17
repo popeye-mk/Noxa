@@ -49,3 +49,26 @@ class UpdaterTest {
         assertFalse(AppUpdater.isNewer("1.9", "1.9-test"))
     }
 }
+
+/** v1.14 one-tap update: the release's assets and the integrity rule. */
+class UpdateFlowTest {
+    private val release = org.json.JSONObject("""{"tag_name": "v1.14", "assets": [
+        {"name": "noxa-v1.14.apk", "browser_download_url": "https://github.com/popeye-mk/Noxa/releases/download/v1.14/noxa-v1.14.apk"},
+        {"name": "noxa-v1.14.apk.sha256", "browser_download_url": "https://github.com/popeye-mk/Noxa/releases/download/v1.14/noxa-v1.14.apk.sha256"},
+        {"name": "evil.apk", "browser_download_url": "https://evil.example/noxa-v1.14.apk"}]}""")
+
+    @Test fun theApkAndItsHashComeOnlyFromOurReleases() {
+        val (apk, sha) = AppUpdater.assetUrls(release)
+        assertEquals("https://github.com/popeye-mk/Noxa/releases/download/v1.14/noxa-v1.14.apk", apk)
+        assertEquals("https://github.com/popeye-mk/Noxa/releases/download/v1.14/noxa-v1.14.apk.sha256", sha)
+        assertEquals("" to "", AppUpdater.assetUrls(org.json.JSONObject("""{"tag_name": "v1.14"}""")))
+    }
+
+    @Test fun noPublishedHashMeansNoInstall() {
+        val h = "ab".repeat(32)
+        assertTrue(AppUpdater.shaMatches(h, h.uppercase()))
+        assertFalse(AppUpdater.shaMatches("", h))
+        assertFalse(AppUpdater.shaMatches(h, "cd".repeat(32)))
+        assertFalse(AppUpdater.shaMatches("short", "short"))
+    }
+}
