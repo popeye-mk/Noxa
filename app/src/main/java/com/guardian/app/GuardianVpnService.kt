@@ -253,6 +253,7 @@ class GuardianVpnService : VpnService() {
         ScamShield.load(this)
         DnsProviders.load(this)
         Bedtime.load(this)                              // v1.14 quiet hours
+        SafeSearch.load(this)                           // v1.14 safe search
         HealthMonitor.onProtectionStarted(this)
         val appCtx = applicationContext
         LiveLog.listener = { e ->
@@ -507,7 +508,7 @@ class GuardianVpnService : VpnService() {
     private fun resolve(ipPacket: ByteArray, len: Int, q: DnsPacket.Query, pkg: String,
                         tunOut: FileOutputStream, skipCname: Boolean = false) {
         val payload = DnsPacket.extractUdpPayload(ipPacket, len) ?: return
-        val cached = cache.get(q, payload)
+        val cached = if (SafeSearch.target(q.domain) != null) null else cache.get(q, payload)   // v1.14
         if (cached != null) {
             answer(ipPacket, len, q, pkg, cached, tunOut, skipCname)
             return
@@ -552,6 +553,23 @@ class GuardianVpnService : VpnService() {
     private fun forward(job: Job, sock: DatagramSocket, tunOut: FileOutputStream) {
         try {
             val payload = DnsPacket.extractUdpPayload(job.packet, job.len) ?: return
+
+            // v1.14 safe search: ask upstream for the search site's safe-mode host instead and
+            // answer the app with a CNAME to it plus its addresses. No usable answer → resolve normally.
+            val safe = SafeSearch.target(job.q.domain)
+            if (safe != null && (job.q.qtype == 1 || job.q.qtype == 28)) {
+                val id = ((payload[0].toInt() and 0xFF) shl 8) or (payload[1].toInt() and 0xFF)
+                val safeQuery = DnsPacket.buildQuery(id, safe, job.q.qtype)
+                val safeReply = (if (encryptedDns.get() && System.currentTimeMillis() >= dohRetryAt) resolveDoh(safeQuery) else null)
+                    ?: resolvePlain(safeQuery, sock)
+                val response = safeReply?.let { DnsPacket.buildCnameResponse(job.packet, job.len, job.q, safe, it, it.size) }
+                if (response != null) {
+                    allowedCount.incrementAndGet(); AppStats.recordAllowed(job.pkg)
+                    LiveLog.add(job.pkg, job.q.domain, LiveLog.Verdict.ALLOWED, SafeSearch.LABEL)
+                    writeTun(tunOut, response)
+                    return
+                }
+            }
 
             // Get the upstream answer — encrypted DNS preferred (growing back-off
             // on failure so a blocked :443 can't stall every query), else plain DNS.

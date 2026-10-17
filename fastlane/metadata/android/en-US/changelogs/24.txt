@@ -2,3 +2,4 @@ New, all optional and off by default (More settings):
 • Report to my home server — an hourly report (protection on/off, blocked counts by category, scam and spyware warnings, never the sites you visit) to a server in your own house, so one screen shows every phone, tablet and TV. Format: docs/HOME-SERVER.md.
 • Parent lock — a PIN before protection can be switched off, paused or weakened.
 • Bedtime — quiet hours in which chosen apps (or all) get no internet.
+• Safe search — Google, YouTube, Bing, DuckDuckGo and Yandex in safe mode.

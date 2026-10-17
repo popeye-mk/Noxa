@@ -247,6 +247,54 @@ object DnsPacket {
         }
     }
 
+    /** A bare DNS query message (no IP/UDP) for [name] / [qtype] with transaction [id]. */
+    fun buildQuery(id: Int, name: String, qtype: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        out.write(byteArrayOf((id shr 8).toByte(), id.toByte(), 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0))
+        out.write(encodeName(name))
+        out.write(byteArrayOf((qtype shr 8).toByte(), qtype.toByte(), 0, 1))
+        return out.toByteArray()
+    }
+
+    /** "a.b.c" → wire format, uncompressed. */
+    fun encodeName(name: String): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        for (label in name.trim().removeSuffix(".").split('.')) {
+            val b = label.toByteArray(Charsets.US_ASCII).take(63).toByteArray()
+            out.write(b.size); out.write(b)
+        }
+        out.write(0)
+        return out.toByteArray()
+    }
+
+    /** v1.14 safe search: answer the app's question for [q].domain with a CNAME to [target] and the
+     *  addresses the upstream gave for the target (in [reply]); null when there is no usable address,
+     *  so the caller resolves normally. The question is copied verbatim; every record name is a pointer
+     *  (to the question, or to the CNAME's target), so nothing in the message can be mis-read. */
+    fun buildCnameResponse(p: ByteArray, len: Int, q: Query, target: String,
+                           reply: ByteArray, replyLen: Int): ByteArray? {
+        val want = when (q.qtype) { TYPE_A -> 4; TYPE_AAAA -> 16; else -> return null }
+        val addrs = answerAddresses(reply, replyLen).filter { it.size == want }.take(8)
+        if (addrs.isEmpty()) return null
+        val question = p.copyOfRange(q.dnsStart, q.questionEnd)       // header + question
+        val qLen = question.size - 12
+        val cname = encodeName(target)
+        val out = java.io.ByteArrayOutputStream()
+        out.write(byteArrayOf(question[0], question[1], 0x81.toByte(), 0x80.toByte(),
+            0, 1, 0, (1 + addrs.size).toByte(), 0, 0, 0, 0))
+        out.write(question, 12, qLen)
+        out.write(byteArrayOf(0xC0.toByte(), 0x0C, 0, 5, 0, 1, 0, 0, 0x01, 0x2C,          // CNAME, TTL 300
+            (cname.size shr 8).toByte(), cname.size.toByte()))
+        val ptr = 0xC000 or (12 + qLen + 12)                                  // → the CNAME's target name
+        out.write(cname)
+        for (a in addrs) {
+            out.write(byteArrayOf((ptr shr 8).toByte(), ptr.toByte(), 0, q.qtype.toByte(), 0, 1,
+                0, 0, 0x01, 0x2C, 0, a.size.toByte()))
+            out.write(a)
+        }
+        return wrapResponse(p, q, out.toByteArray())
+    }
+
     // --- DNS message assembly ------------------------------------------------
     private fun buildDnsMessage(p: ByteArray, q: Query,
                                 flagsHi: Int, flagsLo: Int, answer: ByteArray?): ByteArray {
