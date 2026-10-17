@@ -103,7 +103,35 @@ object AppUpdater {
         } else "You have the latest version ($mine)."
     }
 
-    class Release(val tag: String, val version: String, val url: String)
+    class Release(val tag: String, val version: String, val url: String,
+                  val apkUrl: String = "", val shaUrl: String = "")
+
+    /** Pure, unit-tested: the APK and its .sha256 among a release's assets ("" when absent). */
+    fun assetUrls(release: JSONObject): Pair<String, String> {
+        var apk = ""; var sha = ""
+        val assets = release.optJSONArray("assets") ?: return apk to sha
+        for (i in 0 until assets.length()) {
+            val a = assets.optJSONObject(i) ?: continue
+            val name = a.optString("name"); val url = a.optString("browser_download_url")
+            if (!url.startsWith("https://github.com/popeye-mk/Noxa/releases/download/")) continue
+            if (name.startsWith("noxa-") && name.endsWith(".apk")) apk = url
+            if (name.startsWith("noxa-") && name.endsWith(".apk.sha256")) sha = url
+        }
+        return apk to sha
+    }
+
+    /** Pure, unit-tested: a published SHA-256 must exist and match the downloaded file. */
+    fun shaMatches(expected: String, actual: String): Boolean =
+        expected.length == 64 && expected.equals(actual, ignoreCase = true)
+
+    /** A small text file over HTTPS (the .sha256 next to the APK). */
+    fun fetchText(url: String): String? = try {
+        val c = URL(url).openConnection() as HttpsURLConnection
+        c.connectTimeout = 8000; c.readTimeout = 15000
+        c.instanceFollowRedirects = true
+        if (c.responseCode != 200) { c.errorStream?.close(); null }
+        else c.inputStream.use { String(it.readBytes(), Charsets.UTF_8) }
+    } catch (e: Exception) { Log.w(TAG, "text fetch: $e"); null }
 
     private fun fetchLatest(): Release? = try {
         val c = URL(LATEST_URL).openConnection() as HttpsURLConnection
@@ -114,7 +142,10 @@ object AppUpdater {
             val o = JSONObject(c.inputStream.use { String(it.readBytes(), Charsets.UTF_8) })
             val tag = o.optString("tag_name", "")
             if (tag.isEmpty() || o.optBoolean("prerelease", false) || o.optBoolean("draft", false)) null
-            else Release(tag, tag.removePrefix("v"), o.optString("html_url", "https://github.com/popeye-mk/Noxa/releases/latest"))
+            else {
+                val (apk, sha) = assetUrls(o)
+                Release(tag, tag.removePrefix("v"), o.optString("html_url", "https://github.com/popeye-mk/Noxa/releases/latest"), apk, sha)
+            }
         }
     } catch (e: Exception) { Log.w(TAG, "releases fetch: $e"); null }
 
@@ -141,11 +172,17 @@ object AppUpdater {
                     NotificationChannel(CHANNEL_ID, "App updates", NotificationManager.IMPORTANCE_DEFAULT)
                 )
             }
-            val open = PendingIntent.getActivity(ctx, NOTIF_ID,
-                Intent(Intent.ACTION_VIEW, Uri.parse(r.url)), PendingIntent.FLAG_IMMUTABLE)
+            // v1.14 one-tap update: when the release carries its APK and its .sha256, the tap downloads,
+            // checks and opens Android's installer (UpdateActivity); otherwise the download page as before.
+            val oneTap = r.apkUrl.isNotEmpty() && r.shaUrl.isNotEmpty()
+            val target = if (oneTap) Intent(ctx, UpdateActivity::class.java)
+                .putExtra(UpdateActivity.EXTRA_URL, r.apkUrl).putExtra(UpdateActivity.EXTRA_SHA_URL, r.shaUrl)
+                .putExtra(UpdateActivity.EXTRA_VERSION, r.version)
+            else Intent(Intent.ACTION_VIEW, Uri.parse(r.url))
+            val open = PendingIntent.getActivity(ctx, NOTIF_ID, target, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             mgr.notify(NOTIF_ID, Notification.Builder(ctx, CHANNEL_ID)
                 .setContentTitle("Noxa ${r.version} is available")
-                .setContentText("Tap to open the download page.")
+                .setContentText(if (oneTap) "Tap to download and install." else "Tap to open the download page.")
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentIntent(open)
                 .setAutoCancel(true)
