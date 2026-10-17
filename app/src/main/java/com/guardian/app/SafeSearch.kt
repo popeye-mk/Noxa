@@ -71,7 +71,8 @@ object SafeSearch {
                 .setTitle("🔎 Safe search: " + (if (isOn) "ON" else "off"))
                 .setMessage("Google, YouTube, Bing, DuckDuckGo and Yandex are forced into their safe / restricted " +
                     "mode on this device: explicit results are filtered, YouTube shows its restricted mode. " +
-                    "Works in every browser and app that uses the device's normal DNS; nothing is blocked outright.")
+                    "Works in every browser and app that uses the device's normal DNS; nothing is blocked outright." +
+                    (if (HomeRules.isManaged("safe_search")) "\n\nSet by your home server — a change here comes back at the next report." else ""))
                 .setPositiveButton(if (isOn) "Turn off" else "Turn on") { _, _ ->
                     set(activity, !isOn)
                     Toast.makeText(activity, if (isOn) "Safe search is on." else "Safe search is off.", Toast.LENGTH_SHORT).show()

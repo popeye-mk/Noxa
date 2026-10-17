@@ -111,7 +111,8 @@ object FamilyFilter {
                 .setTitle("👨‍👩‍👧 Family filter: " + (if (on) "ON" else "off"))
                 .setMessage("Blocks adult, gambling and dating sites on this device (a weekly-rebuilt list of several " +
                     "million domains, downloaded on Wi-Fi when you switch it on — about 10 MB). Your own Allowed sites " +
-                    "still win. A list can miss sites or be wrong about one; education sites are left alone.")
+                    "still win. A list can miss sites or be wrong about one; education sites are left alone." +
+                    (if (HomeRules.isManaged("family_filter")) "\n\nSet by your home server — a change here comes back at the next report." else ""))
                 .setPositiveButton(if (on) "Turn off" else "Turn on") { _, _ ->
                     if (on) {
                         setOn(activity, false)

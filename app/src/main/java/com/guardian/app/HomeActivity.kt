@@ -93,6 +93,13 @@ class HomeActivity : Activity() {
             setBackgroundResource(R.drawable.btn_dark); setTextColor(Color.WHITE)
             setOnClickListener { if (save()) sendNow() }
         })
+        col.addView(Button(this).apply {
+            text = "Restore my settings from the home server"
+            setBackgroundResource(R.drawable.btn_dark); setTextColor(Color.WHITE)
+            setOnClickListener { if (save()) restoreFromServer() }
+        })
+        col.addView(muted("For a new or reset phone: your allowed and blocked sites and app choices, as the home server " +
+            "last saw them (sent along with a report whenever they change).").apply { textSize = 12f; setPadding(0, dp(4), 0, dp(6)) })
         status = muted("").apply { setPadding(0, dp(10), 0, 0) }
         col.addView(status)
         col.addView(muted("The exact content of a report, and a tiny example server anyone can run, are in " +
@@ -137,6 +144,28 @@ class HomeActivity : Activity() {
         }.start()
     }
 
+    private fun restoreFromServer() {
+        status.text = "Asking the home server…"
+        Thread {
+            val list = HomeReport.backups(this)
+            runOnUiThread {
+                if (list == null) { status.text = "No answer from the home server (is it on, is the key right?)."; return@runOnUiThread }
+                if (list.isEmpty()) { status.text = "The home server keeps no backups yet."; return@runOnUiThread }
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Restore which device's settings?")
+                    .setItems(list.map { "${it.name} (${it.whenText})" }.toTypedArray()) { _, i ->
+                        status.text = "Restoring…"
+                        Thread {
+                            val msg = HomeReport.restore(this, list[i].id)
+                            runOnUiThread { status.text = msg }
+                        }.start()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }.start()
+    }
+
     private fun sendNow() {
         status.text = "Sending…"
         Thread {
@@ -150,7 +179,8 @@ class HomeActivity : Activity() {
         val when_ = if (last == 0L) "never" else
             java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(last))
         val result = now ?: HomeReport.lastResult(this)
-        status.text = "Last report that got through: $when_." + (if (result.isNotBlank()) "\n$result" else "")
+        status.text = "Last report that got through: $when_." + (if (result.isNotBlank()) "\n$result" else "") +
+            HomeRules.summary(this).let { if (it.isBlank()) "" else "\n$it" }
     }
 
     private fun title(t: String) = TextView(this).apply {
