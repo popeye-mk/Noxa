@@ -165,6 +165,49 @@ for _ in range(300_000):
 check("threats: false-positive rate <= 2e-5 (300k names)", t_fp <= 6, f"{t_fp}/300000")
 check("threats: everyday sites not flagged", not any(t_contains(d) for d in MUST_ALLOW))
 
+# v1.14 family filter (optional download): same strictness, its own file.
+FAMILY_MUST_ALLOW = MUST_ALLOW + [
+    "wikipedia.org", "nl.wikipedia.org", "youtube.com", "www.youtube.com", "netflix.com", "disneyplus.com",
+    "ketnet.be", "vrt.be", "vrtmax.be", "nickelodeon.com", "duolingo.com", "khanacademy.org", "scratch.mit.edu",
+    "smartschool.be", "bingel.be", "kidsweek.nl", "bbc.co.uk", "nasa.gov", "klascement.net",
+]
+f_path = os.path.join(OUT, "family.gbf")
+f_raw = open(f_path, "rb").read()
+f_k = struct.unpack("<I", f_raw[4:8])[0] if len(f_raw) >= 24 else 0      # same header as the main filter
+f_m = struct.unpack("<Q", f_raw[8:16])[0] if len(f_raw) >= 24 else 0
+f_n = struct.unpack("<Q", f_raw[16:24])[0] if len(f_raw) >= 24 else 0
+f_ba = f_raw[24:]
+check("family.gbf format", f_raw[:4] == b"GBF1" and len(f_ba) == (f_m + 7) // 8 and 1 <= f_k <= 64)
+check("family sha256 matches manifest", hashlib.sha256(f_raw).hexdigest() == manifest.get("family_sha256"))
+check("family count matches header/manifest", f_n == manifest.get("family_domains"), f"{f_n} / {manifest.get('family_domains')}")
+check("family list sane (500k..12M)", 500_000 <= f_n <= 12_000_000, f"{f_n:,}")
+def f_contains(d):
+    h = hashlib.sha256(d.encode()).digest()
+    h1 = int.from_bytes(h[0:8], "little"); h2 = int.from_bytes(h[8:16], "little")
+    for i in range(f_k):
+        idx = (h1 + i * h2) % f_m
+        if not (f_ba[idx >> 3] >> (idx & 7)) & 1:
+            return False
+    return True
+f_sample = [l.strip() for l in open(os.path.join(OUT, "family-sample.txt")) if l.strip()]
+check("family: sample present (>= 1000)", len(f_sample) >= 1000, f"{len(f_sample)}")
+check("family: no false negatives (sample)", all(f_contains(d) for d in f_sample))
+f_rng = random.Random(17); f_fp = 0
+for _ in range(300_000):
+    d = "".join(f_rng.choices(string.ascii_lowercase, k=14)) + ".com"
+    if f_contains(d):
+        f_fp += 1
+check("family: false-positive rate <= 4e-5 (300k names)", f_fp <= 12, f"{f_fp}/300000")
+def f_blocked(host):
+    h = host
+    while True:
+        if f_contains(h): return True
+        if "." not in h: return False
+        h = h.split(".", 1)[1]
+f_bad = [d for d in FAMILY_MUST_ALLOW if f_blocked(d)]
+check("family: everyday and children's sites never flagged", not f_bad, ", ".join(f_bad[:10]))
+check("family: an adult-only name is flagged (sanity)", f_blocked("pornhub.com") and f_blocked("xvideos.com"))
+
 stalk_path = os.path.join(OUT, "stalkerware.txt")
 stalk = [l.strip() for l in open(stalk_path)] if os.path.isfile(stalk_path) else []
 stalk = [d for d in stalk if d]

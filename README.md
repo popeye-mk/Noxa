@@ -45,6 +45,7 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Backup & restore** — save your allowed/blocked sites and app settings to a file, restore them on a new phone.
 - **Bedtime** (optional) — quiet hours per device ("21:00 to 07:00"): every app, or the ones a parent chooses, get no internet in that window. Calls and texts keep working. Shown as "Bedtime" in the live feed; changing it asks the parent PIN.
 - **Safe search** (optional) — Google, YouTube, Bing, DuckDuckGo and Yandex forced into safe / restricted mode on the device, the way family DNS services do it (a CNAME to each site's own safe-mode address). Every browser and app that uses the device's DNS; nothing is blocked outright.
+- **Family filter** (optional) — adult, gambling and dating sites blocked on the device: a second list of several million domains, rebuilt weekly, downloaded only when a parent switches it on (about 10 MB), verified by SHA-256. Education sites are left alone; your Allowed sites win.
 - **Parent lock** (optional) — a PIN on a child's phone, tablet or the TV: turning protection off, pausing it, letting an app bypass Noxa, allowing a blocked site or changing the home-server settings asks for it; the tile, widget and notification can't switch it off. Blocking more never needs the PIN. Honest limit: Android lets anyone uninstall an app — a home server notices the silence.
 - **Report to my home server** (optional, off by default) — a family with several phones, tablets and a TV gets one place in their own house that shows every device: protection on or off, blocked counts by category, and whether an app reached a scam or spyware server. Once an hour, only on your home Wi-Fi, only to a private address you typed; never the sites you visit (Noxa doesn't keep them). Format and a 30-line example server: [docs/HOME-SERVER.md](docs/HOME-SERVER.md). Noxa still runs no servers of its own.
 - **Quick Settings tile + "Pause 5 min"** — on/off from the pull-down shade; a one-tap timed pause in the notification that turns itself back on.
@@ -74,6 +75,8 @@ The compiled blocklist ships in `app/src/main/assets/guardian-default.gbf`, so t
 ## Privacy & the "free forever" guarantee
 
 Noxa runs **no servers**, so there's no bill forcing it to monetize you — "free forever" is structural, not a promise. And it's **open source under a copyleft license**, so nobody (not even the author) can close it, add tracking, and sell it: anyone can fork the last free version and keep it free.
+
+Setting up a child's device — parent lock, bedtime, safe search, family filter: [docs/FAMILY.md](docs/FAMILY.md).
 
 The honest limits: DNS-level blocking can't hide same-domain/cosmetic ads (pair with a browser like Brave for that), and it can't stop a service you're logged into from tracking what you do *on it*. See `docs/` for the full, honest breakdown.
 
