@@ -43,6 +43,7 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Home-screen widget + 7-day chart** — status, blocked-today and an on/off button on your home screen; a week of blocked trackers at a glance.
 - **Fresh lists every week** — a GitHub Action rebuilds the filter from every source each Monday and ships it only if strict safety checks pass (no false negatives, no blocked banks/connectivity/messaging apps, no suspicious size swings). Phones pick it up by themselves.
 - **Backup & restore** — save your allowed/blocked sites and app settings to a file, restore them on a new phone.
+- **Report to my home server** (optional, off by default) — a family with several phones, tablets and a TV gets one place in their own house that shows every device: protection on or off, blocked counts by category, and whether an app reached a scam or spyware server. Once an hour, only on your home Wi-Fi, only to a private address you typed; never the sites you visit (Noxa doesn't keep them). Format and a 30-line example server: [docs/HOME-SERVER.md](docs/HOME-SERVER.md). Noxa still runs no servers of its own.
 - **Quick Settings tile + "Pause 5 min"** — on/off from the pull-down shade; a one-tap timed pause in the notification that turns itself back on.
 - **30-day rolling stats**, CSV export, first-run explainer.
 - **Zero telemetry, verifiable.** No location permission, no accounts, nothing phones home.

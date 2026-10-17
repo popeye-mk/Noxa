@@ -258,6 +258,7 @@ class GuardianVpnService : VpnService() {
         }
         FilterUpdater.autoCheck(this)                   // quiet once-a-day refresh
         AppUpdater.autoCheck(this)                      // "a newer Noxa is available"
+        HomeReport.tick(this)                           // v1.14: tell the home server (only if switched on)
 
         // Restore the saved totals so the counter continues instead of resetting
         // to 0 whenever the app/process was killed (MIUI does this aggressively).

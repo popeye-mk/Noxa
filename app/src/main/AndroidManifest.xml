@@ -75,6 +75,11 @@
             android:name=".TunnelActivity"
             android:exported="false" />
 
+        <!-- v1.14 "Report to my home server" — off by default, one tap deeper. -->
+        <activity
+            android:name=".HomeActivity"
+            android:exported="false" />
+
         <!-- User allowlist ("never block these") — one tap deeper. -->
         <activity
             android:name=".AllowlistActivity"
