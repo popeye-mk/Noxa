@@ -254,6 +254,7 @@ class GuardianVpnService : VpnService() {
         DnsProviders.load(this)
         Bedtime.load(this)                              // v1.14 quiet hours
         SafeSearch.load(this)                           // v1.14 safe search
+        FamilyFilter.load(this)                         // v1.14 family filter (if on)
         HealthMonitor.onProtectionStarted(this)
         val appCtx = applicationContext
         LiveLog.listener = { e ->
@@ -267,6 +268,7 @@ class GuardianVpnService : VpnService() {
         }
         FilterUpdater.autoCheck(this)                   // quiet once-a-day refresh
         AppUpdater.autoCheck(this)                      // "a newer Noxa is available"
+        FamilyFilter.autoCheck(this)                    // v1.14: weekly, only while on
         HomeReport.tick(this)                           // v1.14: tell the home server (only if switched on)
 
         // Restore the saved totals so the counter continues instead of resetting
@@ -398,6 +400,14 @@ class GuardianVpnService : VpnService() {
                         // USER ALLOWLIST: "never block this" — overrides the tracker
                         // filter (and skips CNAME-uncloaking) so it always resolves.
                         resolve(buffer, length, query, pkg, output, skipCname = true)
+                    }
+                    FamilyFilter.matches(query.domain) -> {
+                        // v1.14 FAMILY FILTER (optional): adult / gambling / dating sites. The
+                        // user's own Allowed sites above win (parent-gated when the lock is on).
+                        onBlocked()
+                        AppStats.recordBlocked(pkg, FamilyFilter.LABEL)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, FamilyFilter.LABEL)
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     query.domain == DOH_CANARY -> {
                         // Disable browser auto-DoH: answer the canary NXDOMAIN.

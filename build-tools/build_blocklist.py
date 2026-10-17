@@ -73,6 +73,12 @@ CONTENT_CATEGORIES = [
     "vpn", "proxy", "bitcoin", "sexual_education",
 ]
 
+# v1.14 FAMILY FILTER (optional, off by default in the app): the adult, gambling and
+# dating categories, minus the allowlist below, as a SECOND filter the phone downloads
+# only when a parent switches it on. sexual_education is left out on purpose.
+FAMILY_CATEGORIES = ["adult", "porn", "mixed_adult", "lingerie", "gambling", "arjel", "dating"]
+FAMILY_FALSE_POSITIVE_RATE = 1e-5   # a bigger list; 1e-5 keeps it near 10 MB
+
 # NEVER BLOCK. These are whitelists, real banking sites, or sites for children /
 # education. Blocking any of them would be a bug. Listed so it is explicit.
 NEVER_BLOCK = [
@@ -525,6 +531,20 @@ def main():
         f.write("\n".join(threats))
     print("Dangerous-site filter: %d domains, %.2f MB" % (len(threats), ((t_m + 7) // 8) / (1024 * 1024)))
 
+    # v1.14 family filter: its own file, never merged into the default filter.
+    family = set()
+    for cat in FAMILY_CATEGORIES:
+        family.update(read_category(cat))
+    family -= allow
+    family = sorted(family)
+    f_m, f_k = bloom_params(len(family), FAMILY_FALSE_POSITIVE_RATE)
+    write_gbf(os.path.join(OUT, "family.gbf"), f_m, f_k, len(family), build_bloom(family, f_m, f_k))
+    with open(os.path.join(OUT, "family.gbf"), "rb") as f:
+        family_sha256 = hashlib.sha256(f.read()).hexdigest()
+    with open(os.path.join(OUT, "family-sample.txt"), "w") as f:      # a sample for the verifier, not the list
+        f.write("\n".join(family[::max(1, len(family) // 20000)]))
+    print("Family filter: %d domains, %.2f MB" % (len(family), ((f_m + 7) // 8) / (1024 * 1024)))
+
     # Stalkerware list: a plain copy of UT1's category, shipped to the app so it
     # can WARN about spyware (the main filter already blocks these domains).
     stalk = sorted(set(read_category("stalkerware")))
@@ -566,6 +586,10 @@ def main():
         "stalkerware_domains": len(stalk),
         "risky_tlds_sha256": risky_sha256,
         "risky_tlds": len(risky),
+        "family_sha256": family_sha256,          # v1.14: published as a release asset, not in the APK
+        "family_domains": len(family),
+        "family_fp_target": FAMILY_FALSE_POSITIVE_RATE,
+        "family_bloom": {"m_bits": f_m, "k_hashes": f_k},
         "bloom": {"m_bits": m_bits, "k_hashes": k,
                   "size_mb": round(size_mb, 3), "items": n},
         "unique_domains": n,

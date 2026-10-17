@@ -81,6 +81,7 @@ jobs:
             build-tools/out/stalkerware.txt
             build-tools/out/threats.gbf
             build-tools/out/risky-tlds.txt
+            build-tools/out/family.gbf
           if-no-files-found: warn
 
       - name: Commit (main only)
@@ -91,3 +92,17 @@ jobs:
           git add app/src/main/assets/guardian-default.gbf app/src/main/assets/blocklist-manifest.json app/src/main/assets/stalkerware.txt app/src/main/assets/threats.gbf app/src/main/assets/risky-tlds.txt
           git commit -m "Weekly blocklist rebuild ($(date -u +%Y-%m-%d))"
           git push
+
+      # v1.14 family filter: ~10 MB, so it rides on a rolling release asset instead of a weekly
+      # commit. The app downloads it only when a parent switches the Family filter on, and checks
+      # it against family_sha256 in the manifest committed above. Marked not-latest + prerelease so
+      # the app's "new version" notice never points at it.
+      - name: Publish the family filter (main only, release asset)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view family-filter >/dev/null 2>&1 || gh release create family-filter \
+            --title "Family filter (rolling, not an app release)" --prerelease --latest=false \
+            --notes "The optional family filter (adult, gambling, dating categories), rebuilt weekly. Noxa downloads it by itself when the Family filter is switched on. Not an app release."
+          gh release upload family-filter build-tools/out/family.gbf --clobber

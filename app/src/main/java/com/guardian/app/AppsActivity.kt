@@ -259,7 +259,8 @@ class AppsActivity : Activity() {
             "🏠  Report to my home server: " + (if (HomeReport.isOn(this)) "ON" else "off"),
             "🔐  Parent lock: " + (if (ParentLock.isOn(this)) "ON" else "off"),
             "🌙  Bedtime: " + Bedtime.summary(this),
-            "🔎  Safe search: " + (if (SafeSearch.isOn) "ON" else "off")
+            "🔎  Safe search: " + (if (SafeSearch.isOn) "ON" else "off"),
+            "👨‍👩‍👧  Family filter: " + (if (getSharedPreferences(FamilyFilter.PREFS, MODE_PRIVATE).getBoolean("on", false)) "ON" else "off")
         )
         AlertDialog.Builder(this)
             .setTitle("More settings")
@@ -279,6 +280,7 @@ class AppsActivity : Activity() {
                     4 -> ParentLock.manage(this) { showMoreMenu() }
                     5 -> Bedtime.manage(this) { showMoreMenu() }
                     6 -> SafeSearch.manage(this) { showMoreMenu() }
+                    7 -> FamilyFilter.manage(this) { showMoreMenu() }
                 }
             }
             .setNegativeButton("Back") { _, _ -> showToolsMenu() }
