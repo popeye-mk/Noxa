@@ -125,7 +125,11 @@ class HomeActivity : Activity() {
         return true
     }
 
+    @Volatile private var joining = false
+
     private fun findAndJoin() {
+        if (joining) return
+        joining = true
         status.text = "Looking for a home server on this Wi-Fi…"
         Thread {
             val addr = HomeReport.discover()
@@ -139,7 +143,8 @@ class HomeActivity : Activity() {
                     HomeReport.setOn(this, on); if (on) sendNow() else showStatus()
                 }
                 status.text = result
-                if (result.startsWith("Joined")) sendNow()
+                joining = false
+                if (result.startsWith("Joined")) showStatus(result)       // the join already sent the first report
             }
         }.start()
     }
