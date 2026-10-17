@@ -251,13 +251,15 @@ class AppsActivity : Activity() {
     /** Rarely needed: set once and forget. */
     private fun showMoreMenu() {
         ScamShield.load(this)
+        SafeSearch.load(this)
         val items = arrayOf(
             "🧱  Strict scam protection: " + (if (ScamShield.isOn) "ON" else "off"),
             "💾  Back up / restore my settings",
             "📄  Save my report (CSV)",
             "🏠  Report to my home server: " + (if (HomeReport.isOn(this)) "ON" else "off"),
             "🔐  Parent lock: " + (if (ParentLock.isOn(this)) "ON" else "off"),
-            "🌙  Bedtime: " + Bedtime.summary(this)
+            "🌙  Bedtime: " + Bedtime.summary(this),
+            "🔎  Safe search: " + (if (SafeSearch.isOn) "ON" else "off")
         )
         AlertDialog.Builder(this)
             .setTitle("More settings")
@@ -276,6 +278,7 @@ class AppsActivity : Activity() {
                     3 -> startActivity(Intent(this, HomeActivity::class.java))
                     4 -> ParentLock.manage(this) { showMoreMenu() }
                     5 -> Bedtime.manage(this) { showMoreMenu() }
+                    6 -> SafeSearch.manage(this) { showMoreMenu() }
                 }
             }
             .setNegativeButton("Back") { _, _ -> showToolsMenu() }
