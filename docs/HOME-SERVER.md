@@ -78,6 +78,28 @@ Typing a key on a TV remote is no fun, so Noxa can find the server and ask for i
 A server that doesn't support this simply doesn't answer the broadcast; the user types the address and the
 shared key instead. Per-device keys are better anyway: forgetting a device kills only its key.
 
+## Rules from the server (optional)
+
+A server may answer a report with rules for that device, and Noxa applies them (shown on the device as
+"set by your home server"):
+
+```json
+{"ok": true,
+ "rules": {"blocked_sites": ["tiktok.com"], "family_filter": true, "safe_search": null,
+           "bedtime": {"on": true, "start": "21:00", "end": "07:00", "all": false, "apps": ["com.zhiliaoapp.musically"]}},
+ "home_list_version": "3f1a…"}
+```
+
+- `blocked_sites` are blocked on the device even if its Allowed sites list has them (a child can't allow
+  them back). `null` for a flag means "keep the device's own setting".
+- `home_list_version`: when it changes, Noxa posts to `/api/home/list` (with its key, `{"device": {"id": ...}}`)
+  and expects `{"ok": true, "version": "...", "domains": ["..."]}` — the server's own block list (up to
+  50,000 domains), kept on the device and blocked like the sites above.
+- A report may carry `settings_backup`: the device's own Noxa settings backup (the same JSON as the app's
+  Back up feature, ≤ 16 KB), sent when it changed. A server may keep it and answer `/api/home/backups`
+  (`{"ok": true, "backups": [{"id", "name", "when"}]}`) and `/api/home/backup` (`{"id": ...}` →
+  `{"ok": true, "settings": "<json>"}`), so a new phone can restore its settings from the home server.
+
 ## A 30-line server (Python 3, nothing to install)
 
 Save as `home-server.py` on any computer or Raspberry Pi on your Wi-Fi, run

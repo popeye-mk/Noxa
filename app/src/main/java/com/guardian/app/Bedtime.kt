@@ -88,6 +88,19 @@ object Bedtime {
         return blocks(pkg, cachedActive, all, apps)
     }
 
+    /** v1.14: set by the home server (HomeRules). "21:00" / "07:00"; a bad time is ignored. */
+    fun applyRule(ctx: Context, on: Boolean, startHhmm: String, endHhmm: String, allApps: Boolean, chosen: List<String>) {
+        fun minutes(t: String): Int? {
+            val m = Regex("^([01]?\\d|2[0-3]):([0-5]\\d)$").find(t.trim()) ?: return null
+            return m.groupValues[1].toInt() * 60 + m.groupValues[2].toInt()
+        }
+        val s = minutes(startHhmm) ?: return; val e = minutes(endHhmm) ?: return
+        save(ctx) {
+            putBoolean(KEY_ON, on); putInt(KEY_START, s); putInt(KEY_END, e); putBoolean(KEY_ALL, allApps)
+            putString(KEY_APPS, JSONArray(chosen.filter { it.matches(Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")) }).toString())
+        }
+    }
+
     private fun save(ctx: Context, edit: android.content.SharedPreferences.Editor.() -> Unit) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply(edit).apply()
         load(ctx)
@@ -108,7 +121,8 @@ object Bedtime {
         )
         AlertDialog.Builder(activity)
             .setTitle("🌙 Bedtime")
-            .setMessage("In the quiet hours the chosen apps get no internet on this device. Calls and texts still work.")
+            .setMessage("In the quiet hours the chosen apps get no internet on this device. Calls and texts still work." +
+                (if (HomeRules.isManaged("bedtime")) "\n\nSet by your home server — a change here comes back at the next report." else ""))
             .setItems(items) { _, i ->
                 when (i) {
                     0 -> { save(activity) { putBoolean(KEY_ON, !on) }

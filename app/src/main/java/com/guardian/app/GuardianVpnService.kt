@@ -255,6 +255,7 @@ class GuardianVpnService : VpnService() {
         Bedtime.load(this)                              // v1.14 quiet hours
         SafeSearch.load(this)                           // v1.14 safe search
         FamilyFilter.load(this)                         // v1.14 family filter (if on)
+        HomeRules.load(this)                            // v1.14 rules from the home server (if any)
         HealthMonitor.onProtectionStarted(this)
         val appCtx = applicationContext
         LiveLog.listener = { e ->
@@ -394,6 +395,14 @@ class GuardianVpnService : VpnService() {
                         onBlocked()
                         AppStats.recordBlocked(pkg, "Blocked by you · Site")
                         LiveLog.add(pkg, query.domain, LiveLog.Verdict.MINE, "On your block list")
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
+                    }
+                    HomeRules.isBlocked(query.domain) -> {
+                        // v1.14 HOME RULES: set by the home server (a parent) — wins over the
+                        // device's own Allowed sites, so a child can't allow it back.
+                        onBlocked()
+                        AppStats.recordBlocked(pkg, HomeRules.LABEL)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.MINE, "Blocked by your home (set by a parent)")
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     AppStats.isUserAllowed(query.domain) -> {

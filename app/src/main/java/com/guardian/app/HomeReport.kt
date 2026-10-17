@@ -57,7 +57,9 @@ object HomeReport {
     const val HEADER = "X-Home-Key"
     const val INTERVAL_MS = 60L * 60 * 1000          // one report an hour
     const val MIN_TRY_GAP_MS = 10L * 60 * 1000       // after a failure: not again within 10 min
-    const val MAX_BODY = 4096
+    const val MAX_BODY = 24576                         // a report (~2 KB), plus the settings backup when it changed
+    const val MAX_BACKUP = 16384
+    private const val KEY_BACKUP_SENT = "backup_sent"
     private const val MAX_REPLY = 16 * 1024
     private const val TIMEOUT_MS = 5000
     private const val TAG = "Guardian"
@@ -76,7 +78,10 @@ object HomeReport {
     fun isOn(ctx: Context): Boolean =
         prefs(ctx).getBoolean(KEY_ON, false) && parseAddress(address(ctx)) != null && keyOk(key(ctx))
 
-    fun setOn(ctx: Context, on: Boolean) { prefs(ctx).edit().putBoolean(KEY_ON, on).apply() }
+    fun setOn(ctx: Context, on: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_ON, on).apply()
+        if (!on) HomeRules.clear(ctx)                     // no home server, no rules from it
+    }
 
     fun save(ctx: Context, address: String, key: String, name: String) {
         prefs(ctx).edit().putString(KEY_ADDRESS, address.trim()).putString(KEY_KEY, key.trim())
@@ -90,6 +95,8 @@ object HomeReport {
     fun defaultName(ctx: Context): String = try {
         Settings.Global.getString(ctx.contentResolver, "device_name")
     } catch (_: Exception) { null }?.takeIf { it.isNotBlank() } ?: "${Build.MANUFACTURER} ${Build.MODEL}".trim()
+
+    fun installId(ctx: Context): String = id(ctx)
 
     private fun id(ctx: Context): String {
         val p = prefs(ctx)
@@ -262,6 +269,31 @@ object HomeReport {
         }
     }
 
+    // --- restore the device's settings from the home server --------------------------
+    class Backup(val id: String, val name: String, val whenText: String)
+
+    /** The settings backups the home server keeps (one per device). Off the main thread. */
+    fun backups(ctx: Context): List<Backup>? {
+        val target = parseAddress(address(ctx)) ?: return null
+        val body = JSONObject().put("device", JSONObject().put("id", id(ctx))).toString().toByteArray(Charsets.UTF_8)
+        val reply = try { exchange(target, request(target.host, target.port, key(ctx), body, "/api/home/backups")) } catch (_: Exception) { return null }
+        if (statusOf(reply) != 200) return null
+        val arr = try { JSONObject(bodyOf(reply)).optJSONArray("backups") } catch (_: Exception) { null } ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { Backup(it.optString("id"), it.optString("name"), it.optString("when")) } }
+    }
+
+    /** Restore one of them into this device (merge, never deletes). Returns plain words. Off the main thread. */
+    fun restore(ctx: Context, backupId: String): String {
+        val target = parseAddress(address(ctx)) ?: return "That isn't a home address."
+        val body = JSONObject().put("device", JSONObject().put("id", id(ctx))).put("id", backupId).toString().toByteArray(Charsets.UTF_8)
+        val reply = try { exchange(target, request(target.host, target.port, key(ctx), body, "/api/home/backup")) }
+            catch (_: Exception) { return "No answer from ${target.host}:${target.port}." }
+        if (statusOf(reply) != 200) return "The home server has no backup for that device."
+        val settings = try { JSONObject(bodyOf(reply)).optString("settings") } catch (_: Exception) { "" }
+        if (settings.isBlank()) return "The backup was empty."
+        return try { AppStats.importSettings(ctx, settings) } catch (e: IllegalArgumentException) { e.message ?: "That wasn't a Noxa backup." }
+    }
+
     // --- doing it --------------------------------------------------------------
     /** Called by the watchdog every ~15 min and at each protection start. */
     fun tick(ctx: Context, now: Long = System.currentTimeMillis()) {
@@ -283,7 +315,14 @@ object HomeReport {
         if (TunnelController.isUp) return remember(ctx, "Not sent: the private tunnel is on, so you're not at home.")
         if (!onHomeNetwork(ctx)) return remember(ctx, "Not sent: not on Wi-Fi.")
         val facts = facts(ctx, now)
-        val body = payload(facts).toString().toByteArray(Charsets.UTF_8)
+        val json = payload(facts)
+        // the device's own settings (allowed / blocked sites, app choices) ride along when they changed,
+        // so a new phone can be restored from the home server (never stats, never history)
+        val backup = try { AppStats.exportSettings() } catch (_: Exception) { "" }
+        val backupHash = backup.hashCode().toString()
+        val sendBackup = backup.isNotEmpty() && backup.length <= MAX_BACKUP && backupHash != (p.getString(KEY_BACKUP_SENT, "") ?: "")
+        if (sendBackup) json.put("settings_backup", backup)
+        val body = json.toString().toByteArray(Charsets.UTF_8)
         if (body.size > MAX_BODY) return remember(ctx, "The report came out too large — not sent.")
         val reply = try {
             exchange(target, request(target.host, target.port, key, body))
@@ -295,7 +334,14 @@ object HomeReport {
             200 -> {
                 p.edit().putLong(KEY_LAST_SENT, now)
                     .putString(KEY_SNAPSHOT, JSONObject(AppStats.globalCompanyCounts()).toString()).apply()
-                remember(ctx, "Sent at ${time(now)} — the home server said OK.")
+                if (sendBackup) p.edit().putString(KEY_BACKUP_SENT, backupHash).apply()
+                try {                                           // the answer may carry rules for this device
+                    val answer = JSONObject(bodyOf(reply))
+                    HomeRules.apply(ctx, answer.optJSONObject("rules"), answer.optString("home_list_version"))
+                } catch (e: Exception) { Log.w(TAG, "home rules: $e") }
+                remember(ctx, "Sent at ${time(now)} — the home server said OK." +
+                    (if (HomeRules.blockedCount() > 0 || HomeRules.isManaged("bedtime") || HomeRules.isManaged("safe_search") ||
+                         HomeRules.isManaged("family_filter")) " " + HomeRules.summary(ctx) else ""))
             }
             401, 403 -> remember(ctx, "The home server refused the key — check it.")
             -1 -> remember(ctx, "Something at ${target.host}:${target.port} answered, but not a home server.")
@@ -360,14 +406,17 @@ object HomeReport {
         ctx.packageManager.queryIntentActivities(i, 0).any { it.activityInfo.packageName == pkg }
     } catch (_: Exception) { false }
 
-    private fun exchange(t: Target, req: ByteArray): String = Socket().use { s ->
+    private fun exchange(t: Target, req: ByteArray): String = exchangeWith(t, req, MAX_REPLY)
+
+    /** One HTTP exchange over a plain socket (the home network only); the reply capped at [maxReply]. */
+    fun exchangeWith(t: Target, req: ByteArray, maxReply: Int): String = Socket().use { s ->
         s.connect(InetSocketAddress(InetAddress.getByAddress(t.bytes), t.port), TIMEOUT_MS)
         s.soTimeout = TIMEOUT_MS
         s.getOutputStream().apply { write(req); flush() }
         val buf = ByteArrayOutputStream()
         val tmp = ByteArray(2048)
         val input = s.getInputStream()
-        while (buf.size() < MAX_REPLY) {
+        while (buf.size() < maxReply) {
             val n = input.read(tmp)
             if (n < 0) break
             buf.write(tmp, 0, n)
