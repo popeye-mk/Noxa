@@ -256,7 +256,8 @@ class AppsActivity : Activity() {
             "💾  Back up / restore my settings",
             "📄  Save my report (CSV)",
             "🏠  Report to my home server: " + (if (HomeReport.isOn(this)) "ON" else "off"),
-            "🔐  Parent lock: " + (if (ParentLock.isOn(this)) "ON" else "off")
+            "🔐  Parent lock: " + (if (ParentLock.isOn(this)) "ON" else "off"),
+            "🌙  Bedtime: " + Bedtime.summary(this)
         )
         AlertDialog.Builder(this)
             .setTitle("More settings")
@@ -274,6 +275,7 @@ class AppsActivity : Activity() {
                     2 -> exportCsv()
                     3 -> startActivity(Intent(this, HomeActivity::class.java))
                     4 -> ParentLock.manage(this) { showMoreMenu() }
+                    5 -> Bedtime.manage(this) { showMoreMenu() }
                 }
             }
             .setNegativeButton("Back") { _, _ -> showToolsMenu() }
