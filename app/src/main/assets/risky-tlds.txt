@@ -15,7 +15,6 @@ business
 cam
 casino
 ceo
-cfd
 channel
 charity
 cheap
@@ -37,7 +36,6 @@ enterprises
 esq
 exposed
 faith
-family
 fans
 financial
 fishing
@@ -91,7 +89,6 @@ rehab
 ren
 repair
 review
-reviews
 rich
 rodeo
 ryukyu
