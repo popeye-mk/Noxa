@@ -252,6 +252,7 @@ class GuardianVpnService : VpnService() {
         Threats.load(this)
         ScamShield.load(this)
         DnsProviders.load(this)
+        Bedtime.load(this)                              // v1.14 quiet hours
         HealthMonitor.onProtectionStarted(this)
         val appCtx = applicationContext
         LiveLog.listener = { e ->
@@ -366,6 +367,14 @@ class GuardianVpnService : VpnService() {
                         onBlocked()
                         AppStats.recordBlocked(pkg, "Blocked by you · Mobile data")
                         LiveLog.add(pkg, query.domain, LiveLog.Verdict.FIREWALL, "Blocked on mobile data (by you)")
+                        DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
+                    }
+                    Bedtime.blocksNow(pkg) -> {
+                        // v1.14 BEDTIME: in the quiet hours a parent set, the chosen apps
+                        // (or all) get no internet — same pipeline as the firewall.
+                        onBlocked()
+                        AppStats.recordBlocked(pkg, Bedtime.LABEL)
+                        LiveLog.add(pkg, query.domain, LiveLog.Verdict.FIREWALL, "Bedtime (set by a parent)")
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     AppStats.isFirewalled(pkg) -> {

@@ -1,2 +1,4 @@
-New: "Report to my home server" (off by default, More settings). Switch it on and Noxa sends a short hourly report to a server in your own house — protection on/off, blocked counts by category, scam and spyware warnings — so one screen at home shows every phone, tablet and TV. Only on your home Wi-Fi, never the sites you visit. Format: docs/HOME-SERVER.md.
-New: Parent lock — a PIN before protection can be switched off, paused or weakened on a child's device.
+New, all optional and off by default (More settings):
+• Report to my home server — an hourly report (protection on/off, blocked counts by category, scam and spyware warnings, never the sites you visit) to a server in your own house, so one screen shows every phone, tablet and TV. Format: docs/HOME-SERVER.md.
+• Parent lock — a PIN before protection can be switched off, paused or weakened.
+• Bedtime — quiet hours in which chosen apps (or all) get no internet.
