@@ -1,7 +1,7 @@
 New parent features, all optional, off by default (More settings):
 • Report to my home server — hourly counts and warnings (never the sites you visit) to a server in your own house: one screen for every device; join with one tap. See docs/HOME-SERVER.md.
-• Parent lock — a PIN before protection can be switched off or weakened.
-• Bedtime — quiet hours, chosen apps get no internet.
-• Safe search — Google, YouTube, Bing, DuckDuckGo, Yandex in safe mode.
+• Parent lock — a PIN before protection can be switched off.
+• Bedtime — quiet hours, chosen apps go offline.
+• Safe search — Google, YouTube, Bing, DuckDuckGo, Yandex.
 • Family filter — adult, gambling, dating sites.
 Also: updates in one tap.
