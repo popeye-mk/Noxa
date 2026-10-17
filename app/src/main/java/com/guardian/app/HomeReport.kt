@@ -80,7 +80,8 @@ object HomeReport {
 
     fun setOn(ctx: Context, on: Boolean) {
         prefs(ctx).edit().putBoolean(KEY_ON, on).apply()
-        if (!on) HomeRules.clear(ctx)                     // no home server, no rules from it
+        if (on) HomeReportReceiver.schedule(ctx)          // its own hourly alarm, also while protection is off
+        else { HomeReportReceiver.cancel(ctx); HomeRules.clear(ctx) }   // no home server, no rules from it
     }
 
     fun save(ctx: Context, address: String, key: String, name: String) {
