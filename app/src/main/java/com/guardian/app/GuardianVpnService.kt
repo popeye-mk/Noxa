@@ -270,6 +270,7 @@ class GuardianVpnService : VpnService() {
         FilterUpdater.autoCheck(this)                   // quiet once-a-day refresh
         AppUpdater.autoCheck(this)                      // "a newer Noxa is available"
         FamilyFilter.autoCheck(this)                    // v1.14: weekly, only while on
+        HomeReportReceiver.schedule(this)               // v1.14: the report's own hourly alarm (if switched on)
         HomeReport.tick(this)                           // v1.14: tell the home server (only if switched on)
 
         // Restore the saved totals so the counter continues instead of resetting

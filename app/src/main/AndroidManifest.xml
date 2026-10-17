@@ -171,6 +171,11 @@
             </intent-filter>
         </service>
 
+        <!-- v1.14 the home-server report's own hourly alarm (also while protection is off). -->
+        <receiver
+            android:name=".HomeReportReceiver"
+            android:exported="false" />
+
         <!-- v1.2 keep-alive watchdog: every ~15 min + after boot, restarts
              protection if an aggressive battery manager killed it and the user
              still wants it on. Runs entirely on-device. -->
