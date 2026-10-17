@@ -65,6 +65,7 @@ class NoxaWidget : AppWidgetProvider() {
             val button: PendingIntent = when {
                 // The user must see something first -> the app handles it.
                 tunnel || VpnService.prepare(ctx) != null -> openApp
+                on && ParentLock.isOn(ctx) -> openApp                  // v1.14: the app asks the PIN
                 on -> PendingIntent.getService(ctx, 11,
                     svc.setAction(GuardianVpnService.ACTION_STOP), flags)
                 Build.VERSION.SDK_INT >= 26 -> PendingIntent.getForegroundService(ctx, 12,

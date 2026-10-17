@@ -188,6 +188,13 @@ class GuardianVpnService : VpnService() {
     private val dohFailures = AtomicInteger(0)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // v1.14 parent lock: the tile, the widget or the notification can't switch protection off —
+        // only the app can, after the PIN (it adds EXTRA_UNLOCKED). Blocking more never needs it.
+        if ((intent?.action == ACTION_STOP || intent?.action == ACTION_PAUSE) &&
+            !ParentLock.allows(ParentLock.isOn(this), intent.getBooleanExtra(ParentLock.EXTRA_UNLOCKED, false))) {
+            if (!running.get()) stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent?.action == ACTION_STOP) {
             setWantsProtection(this, false)      // the USER said stop —
             WatchdogReceiver.cancel(this)        // the watchdog must not resurrect it
@@ -809,13 +816,14 @@ class GuardianVpnService : VpnService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val today = DailyStats.today()
+        val locked = ParentLock.isOn(this)
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Noxa is protecting you")
+            .setContentTitle(if (locked) "Noxa is protecting you (parent lock)" else "Noxa is protecting you")
             .setContentText(if (today == 0L) "Blocking trackers and ads"
                             else "%,d tracking attempts blocked today".format(today))
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(open)
-            .addAction(Notification.Action.Builder(null, "Pause 5 min", pause).build())
+            .apply { if (!locked) addAction(Notification.Action.Builder(null, "Pause 5 min", pause).build()) }
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()

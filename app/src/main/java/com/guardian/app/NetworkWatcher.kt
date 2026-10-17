@@ -123,7 +123,8 @@ object NetworkWatcher {
             try {
                 val blockerWanted = GuardianVpnService.wantsProtection(ctx)
                 p.edit().putBoolean(KEY_WANTED_BLOCKER, blockerWanted).apply()
-                ctx.startService(Intent(ctx, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP))
+                ctx.startService(Intent(ctx, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP)
+                    .putExtra(ParentLock.EXTRA_UNLOCKED, true))     // the guard keeps protecting (tunnel + blocking DNS)
                 Thread.sleep(700)
                 TunnelController.up(ctx, cfg, p.getBoolean(TunnelActivity.KEY_BLOCK, true))
                 p.edit().putBoolean(KEY_ENGAGED, true).apply()

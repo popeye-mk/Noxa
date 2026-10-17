@@ -255,7 +255,8 @@ class AppsActivity : Activity() {
             "🧱  Strict scam protection: " + (if (ScamShield.isOn) "ON" else "off"),
             "💾  Back up / restore my settings",
             "📄  Save my report (CSV)",
-            "🏠  Report to my home server: " + (if (HomeReport.isOn(this)) "ON" else "off")
+            "🏠  Report to my home server: " + (if (HomeReport.isOn(this)) "ON" else "off"),
+            "🔐  Parent lock: " + (if (ParentLock.isOn(this)) "ON" else "off")
         )
         AlertDialog.Builder(this)
             .setTitle("More settings")
@@ -272,6 +273,7 @@ class AppsActivity : Activity() {
                         .show()
                     2 -> exportCsv()
                     3 -> startActivity(Intent(this, HomeActivity::class.java))
+                    4 -> ParentLock.manage(this) { showMoreMenu() }
                 }
             }
             .setNegativeButton("Back") { _, _ -> showToolsMenu() }
@@ -445,8 +447,10 @@ class AppsActivity : Activity() {
                     Toast.LENGTH_LONG).show()
             }
             .setNeutralButton(if (excluded) "Filter this app again" else "Don't filter this app") { _, _ ->
-                AppStats.setNoFilter(this, pkg, !excluded)
-                reapplyProtection(if (!excluded) "$name will bypass Noxa." else "$name is filtered again.")
+                ParentLock.gate(this, "let $name bypass Noxa", action = {
+                    AppStats.setNoFilter(this, pkg, !excluded)
+                    reapplyProtection(if (!excluded) "$name will bypass Noxa." else "$name is filtered again.")
+                })
             }
             .show()
     }
@@ -514,12 +518,16 @@ class AppsActivity : Activity() {
             .setMessage("$gentle\n\n2. Strong: let $name bypass Noxa completely (it works, but isn't protected).")
             .apply {
                 if (blocked.isNotEmpty()) setPositiveButton("Allow those sites") { _, _ ->
-                    blocked.forEach { AppStats.addUserAllow(this@AppsActivity, it) }
-                    Toast.makeText(this@AppsActivity, "Allowed ${blocked.size} site(s). Try $name again.", Toast.LENGTH_LONG).show()
+                    ParentLock.gate(this@AppsActivity, "allow sites for $name", action = {
+                        blocked.forEach { AppStats.addUserAllow(this@AppsActivity, it) }
+                        Toast.makeText(this@AppsActivity, "Allowed ${blocked.size} site(s). Try $name again.", Toast.LENGTH_LONG).show()
+                    })
                 }
             }
             .setNeutralButton("Bypass Noxa") { _, _ ->
-                AppStats.setNoFilter(this, pkg, true); reapplyProtection("$name now bypasses Noxa.")
+                ParentLock.gate(this, "let $name bypass Noxa", action = {
+                    AppStats.setNoFilter(this, pkg, true); reapplyProtection("$name now bypasses Noxa.")
+                })
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -532,7 +540,8 @@ class AppsActivity : Activity() {
             Toast.makeText(this, done, Toast.LENGTH_LONG).show(); return
         }
         Toast.makeText(this, "$done Applying…", Toast.LENGTH_SHORT).show()
-        startService(Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP))
+        startService(Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP)
+            .putExtra(ParentLock.EXTRA_UNLOCKED, true))         // a rebuild, not an "off" (and gated above)
         android.os.Handler(mainLooper).postDelayed({
             val svc = Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_START)
             try {

@@ -29,7 +29,8 @@ class HomeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(buildUi())
+        // v1.14 parent lock: the address, key and switch are a parent's business
+        ParentLock.gate(this, "change the home-server settings", onCancel = { finish() }) { setContentView(buildUi()) }
     }
 
     override fun onResume() { super.onResume(); showStatus() }
