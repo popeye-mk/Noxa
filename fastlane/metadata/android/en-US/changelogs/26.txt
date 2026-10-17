@@ -1,0 +1,2 @@
+Fix: on a TV the protection check-up no longer asks for a battery exemption or an Always-on VPN setting the TV doesn't have.
+The remote's focus reaches "Settings & tools" on the "Who's tracking you" screen.

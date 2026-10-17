@@ -39,6 +39,11 @@ class CheckupActivity : Activity() {
 
     private fun items(): List<Item> {
         val out = ArrayList<Item>()
+        // v1.14.2: on a TV there is no battery saver, and most TVs have no Always-on VPN setting —
+        // those two rows must not nag for things that can't be done there (Stoyan's TV, 2026-10-17).
+        val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
+            (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) ==
+                android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
         val on = GuardianVpnService.isRunning.get() || TunnelController.isUp
         out += Item(on, "Protection is on",
             if (on) "Trackers, scams and spyware servers are being blocked."
@@ -62,9 +67,10 @@ class CheckupActivity : Activity() {
         val systemOk = pm.isIgnoringBatteryOptimizations(packageName)
         val confirmed = ui.getBoolean(KEY_BATTERY_CONFIRMED, false)
         val proven = HealthMonitor.batteryProvenOk(this)       // v1.11: judged from real behaviour
-        val battery = systemOk || confirmed || proven
+        val battery = systemOk || confirmed || proven || isTv
         out += Item(battery, "Allowed to run in the background",
             when {
+                isTv -> "A TV is always powered: nothing stops Noxa to save battery."
                 systemOk -> "The battery manager won't kill protection."
                 proven -> "No unexpected stops for 3+ days — the phone lets Noxa run."
                 confirmed -> "You set Noxa to \"No restrictions\" in the phone's battery settings."
@@ -81,13 +87,15 @@ class CheckupActivity : Activity() {
             .putBoolean(GuardianVpnService.KEY_LOCKDOWN, liveAo.second).apply()
         val alwaysOn = liveAo?.first ?: prefs.getBoolean(GuardianVpnService.KEY_ALWAYS_ON, false)
         val lockdown = liveAo?.second ?: prefs.getBoolean(GuardianVpnService.KEY_LOCKDOWN, false)
-        out += Item(alwaysOn, "Always-on VPN",
+        val noVpnSettings = isTv && Intent(Settings.ACTION_VPN_SETTINGS).resolveActivity(packageManager) == null
+        out += Item(alwaysOn || noVpnSettings, "Always-on VPN",
             when {
                 alwaysOn && lockdown -> "On, with \"block connections without VPN\": nothing leaks, even if Noxa restarts."
                 alwaysOn -> "On: Android restarts Noxa itself after a reboot or kill."
+                noVpnSettings -> "This TV has no Always-on VPN setting. After a reboot the watchdog brings protection back within 15 minutes."
                 else -> "Off: after a reboot or a kill there's a gap until the watchdog (≤15 min) restarts protection."
             },
-            if (alwaysOn) null else "Set up") {
+            if (alwaysOn || noVpnSettings) null else "Set up") {
             Toast.makeText(this, "Tap the gear ⚙ next to Noxa, then turn on \"Always-on VPN\".", Toast.LENGTH_LONG).show()
             try { startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) } catch (_: Exception) {}
         }
