@@ -145,6 +145,28 @@ class Handler(BaseHTTPRequestHandler):
 HTTPServer(("0.0.0.0", 8790), Handler).serve_forever()
 ```
 
+### Home Assistant
+
+The example server above keeps one JSON file per device. Home Assistant reads such a file with a
+`command_line` sensor (replace the path and the device id):
+
+```yaml
+command_line:
+  - sensor:
+      name: "Noxa Kids tablet"
+      command: "cat /config/noxa-reports/<device-id>.json"
+      value_template: "{{ value_json.blocked_today }}"
+      json_attributes:
+        - protection
+        - since_last
+        - apps_30d
+      scan_interval: 600
+```
+
+`protection.on`, `since_last.categories` and `apps_30d` then show up as attributes, ready for a card or an
+automation ("notify me when a device reaches a spyware server"). Any home server that speaks HTTP can do the same
+with a REST sensor pointed at its own API.
+
 A device that stops reporting for a day is the signal worth acting on: Noxa
 was switched off, uninstalled, or the device is away. Any home dashboard
 (Home Assistant, a script, a spreadsheet) can read the JSON files.
