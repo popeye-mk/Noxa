@@ -29,6 +29,11 @@ import android.widget.Toast
  */
 class AppsActivity : Activity() {
 
+    // v1.14 TV/D-pad: the remote's focus is pinned switch → Settings & tools → first app row,
+    // because Android's own focus search skipped the button on a TV (Stoyan, 2026-10-17).
+    private var dohSwitch: Switch? = null
+    private var toolsButton: Button? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppStats.load(this)
@@ -87,6 +92,9 @@ class AppsActivity : Activity() {
             setBackgroundResource(R.drawable.btn_dark)
             setTextColor(Color.WHITE)
             setOnClickListener { showToolsMenu() }
+            id = View.generateViewId(); isFocusable = true
+            toolsButton = this
+            dohSwitch?.let { sw -> nextFocusUpId = sw.id; sw.nextFocusDownId = id }
         })
 
         root.addView(TextView(this).apply {
@@ -106,7 +114,14 @@ class AppsActivity : Activity() {
                 setPadding(dp(4), dp(24), dp(4), 0)
             })
         } else {
-            for (pkg in apps) list.addView(row(pkg))
+            for ((i, pkg) in apps.withIndex()) {
+                val r = row(pkg)
+                if (i == 0) {                                   // the remote: button ↔ first row
+                    r.id = View.generateViewId()
+                    toolsButton?.let { b -> b.nextFocusDownId = r.id; r.nextFocusUpId = b.id }
+                }
+                list.addView(r)
+            }
         }
         // The list fills the rest of the screen and scrolls; the header above
         // stays put — so the tools never push the apps off-screen.
@@ -189,6 +204,8 @@ class AppsActivity : Activity() {
             })
         }
         val sw = Switch(this).apply {
+            id = View.generateViewId()
+            dohSwitch = this
             isChecked = GuardianVpnService.encryptedDns.get()
             thumbTintList = resources.getColorStateList(R.color.switch_thumb, theme)
             trackTintList = resources.getColorStateList(R.color.switch_track, theme)
