@@ -100,6 +100,15 @@ A server may answer a report with rules for that device, and Noxa applies them (
   (`{"ok": true, "backups": [{"id", "name", "when"}]}`) and `/api/home/backup` (`{"id": ...}` →
   `{"ok": true, "settings": "<json>"}`), so a new phone can restore its settings from the home server.
 
+## A Linux PC in the same picture
+
+Noxa runs on Android only, but a home server wants the whole house. `pc/noxa-pc.sh` makes a Linux PC
+report in the same format (device `noxa` = `pc-1.0`, no blocks) plus a `pc` block: `os`, `updates_pending`,
+`security_pending`, `reboot_required`, `firewall`, `auto_updates`, `quad9`, `uptime_days`. One run with sudo —
+`sudo bash noxa-pc.sh setup --name "Office PC"` — finds the server on the Wi-Fi and joins while its door is open
+(or takes `--address` and `--key`), sets Quad9 with DNS over TLS, switches ufw and unattended-upgrades on, and
+installs an hourly systemd timer. `noxa-pc.sh remove` takes the report away; the hardening stays.
+
 ## A 30-line server (Python 3, nothing to install)
 
 Save as `home-server.py` on any computer or Raspberry Pi on your Wi-Fi, run
