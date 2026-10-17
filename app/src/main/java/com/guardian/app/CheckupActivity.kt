@@ -116,6 +116,20 @@ class CheckupActivity : Activity() {
             }.start()
         }
 
+        // v1.14: when the device reports to a home server, say whether that still works.
+        if (HomeReport.isOn(this)) {
+            val age = System.currentTimeMillis() - HomeReport.lastSent(this)
+            val heard = HomeReport.lastSent(this) > 0L && age < 3L * 60 * 60 * 1000
+            out += Item(heard, "Home server hears from this device",
+                if (heard) "Last report ${age / 60000} min ago."
+                else "No report got through lately. " + HomeReport.lastResult(this).ifBlank { "Not sent yet." },
+                if (heard) null else "Send now") {
+                Thread {
+                    val msg = HomeReport.send(this)
+                    runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_LONG).show(); refresh() }
+                }.start()
+            }
+        }
         val g = AppStats.globalCompanyCounts()
         val danger = g.filterKeys { it.startsWith("Dangerous site") }.values.sum()
         // Spyware: only a NON-browser app reaching a spyware server is a

@@ -25,6 +25,7 @@ class WatchdogReceiver : BroadcastReceiver() {
 
     override fun onReceive(ctx: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) schedule(ctx)
+        HomeReport.tick(ctx)                                    // v1.14: the hourly home-server report (off by default)
         if (!GuardianVpnService.wantsProtection(ctx)) return   // user turned it off
         HealthMonitor.check(ctx)                                // v1.11: the check-up runs by itself
         if (GuardianVpnService.isRunning.get()) return          // alive — nothing to do

@@ -254,7 +254,8 @@ class AppsActivity : Activity() {
         val items = arrayOf(
             "🧱  Strict scam protection: " + (if (ScamShield.isOn) "ON" else "off"),
             "💾  Back up / restore my settings",
-            "📄  Save my report (CSV)"
+            "📄  Save my report (CSV)",
+            "🏠  Report to my home server: " + (if (HomeReport.isOn(this)) "ON" else "off")
         )
         AlertDialog.Builder(this)
             .setTitle("More settings")
@@ -270,6 +271,7 @@ class AppsActivity : Activity() {
                         .setNegativeButton("Back") { _, _ -> showMoreMenu() }
                         .show()
                     2 -> exportCsv()
+                    3 -> startActivity(Intent(this, HomeActivity::class.java))
                 }
             }
             .setNegativeButton("Back") { _, _ -> showToolsMenu() }
