@@ -15,6 +15,7 @@ Features:
 • Hide my IP — optional WireGuard tunnel through YOUR provider (Proton, Mullvad, IVPN, or your own server), with blocking active while tunnelling
 • Your own allowlist — un-block anything, yourself
 • 30-day rolling stats, CSV export
+• For families (all optional, off by default): parent lock, bedtime, safe search, a family filter — and "Report to my home server": every phone, tablet and TV sends an hourly report (counts and warnings, never the sites you visit) to a server in YOUR own house, so one screen shows the whole home. The format is plain JSON: a 30-line script, Home Assistant, or any dashboard you like can receive it, and a server can send rules back (blocked sites, bedtime, filters) that Noxa applies on each device.
 
 The guarantees:
 

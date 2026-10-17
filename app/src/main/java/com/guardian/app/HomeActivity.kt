@@ -46,6 +46,8 @@ class HomeActivity : Activity() {
             "Off unless you switch it on. When on, Noxa sends a short report once an hour to a server in YOUR " +
             "house — an address on your own Wi-Fi — so one screen at home can show every phone, tablet and TV: " +
             "protection on or off, how much was blocked, and whether any app reached a scam or spyware server.\n\n" +
+            "That server can be a 30-line script, Home Assistant, or any dashboard you like — the report is plain JSON — and " +
+            "it can send rules back (blocked sites, bedtime, filters) that Noxa applies here.\n\n" +
             "Noxa never sends the sites you visit — it doesn't even keep them. Nothing goes to the internet: only " +
             "on your home Wi-Fi, never on mobile data, never in tunnel mode, only to a home address.\n\n" +
             "If a parent set this up: the home server sees counts and warnings, never what you looked at."
