@@ -261,7 +261,11 @@ object HomeReport {
             200 -> {
                 val key = json.optString("key")
                 if (!keyOk(key)) "The home server answered, but without a usable key."
-                else { save(ctx, address, key, name(ctx)); setOn(ctx, true); "Joined. " + json.optString("message") }
+                else {
+                    save(ctx, address, key, name(ctx)); setOn(ctx, true)
+                    val first = try { send(ctx) } catch (_: Exception) { "" }
+                    "Joined. " + json.optString("message") + " " + first
+                }
             }
             403 -> json.optString("message").ifBlank { "The door is closed — open it in the home server's app first." }
             -1 -> "Something at ${target.host}:${target.port} answered, but not a home server."
@@ -345,6 +349,7 @@ object HomeReport {
             }
             401, 403 -> remember(ctx, "The home server refused the key — check it.")
             -1 -> remember(ctx, "Something at ${target.host}:${target.port} answered, but not a home server.")
+            429 -> remember(ctx, "Too soon — the home server just got a report from this device. Try again in a moment.")
             else -> remember(ctx, "The home server answered with error $code.")
         }
     }
