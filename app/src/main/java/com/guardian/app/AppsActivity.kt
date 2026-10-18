@@ -64,6 +64,7 @@ class AppsActivity : Activity() {
             setPadding(dp(20), dp(24), dp(20), dp(20))
         }
 
+        root.addView(BackBar.build(this))
         root.addView(TextView(this).apply {
             text = "Who's tracking you"
             setTextColor(Color.WHITE); textSize = 24f

@@ -41,6 +41,7 @@ class HomeActivity : Activity() {
             setBackgroundResource(R.drawable.bg_main)
             setPadding(dp(20), dp(24), dp(20), dp(24))
         }
+        col.addView(BackBar.build(this))
         col.addView(title("Report to my home server"))
         col.addView(muted(
             "Off unless you switch it on. When on, Noxa sends a short report once an hour to a server in YOUR " +

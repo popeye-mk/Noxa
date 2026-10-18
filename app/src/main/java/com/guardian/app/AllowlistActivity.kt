@@ -40,6 +40,7 @@ class AllowlistActivity : Activity() {
             setPadding(dp(20), dp(24), dp(20), dp(24))
         }
 
+        root.addView(BackBar.build(this))
         root.addView(TextView(this).apply {
             text = if (blockMode) "My blocked sites" else "Allowed sites"
             setTextColor(Color.WHITE); textSize = 24f
