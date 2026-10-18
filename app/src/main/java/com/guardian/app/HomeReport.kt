@@ -167,10 +167,15 @@ object HomeReport {
 
     class App(val name: String, val count: Long, val browser: Boolean)
 
+    /** 1.14.4: which parent features are on, and which the home server sets — never what was looked at. */
+    class Filters(val family: Boolean = false, val safeSearch: Boolean = false, val parentLock: Boolean = false,
+                  val managed: List<String> = emptyList())
+
     class Facts(val id: String, val name: String, val model: String, val android: String, val version: String,
                 val protectionOn: Boolean, val alwaysOn: Boolean?, val builtAt: String, val stopsToday: Int,
                 val today: Long, val days: List<Long>, val since: Map<String, Long>,
-                val dangerApps: List<App>, val spyApps: List<App>, val sentAt: Long)
+                val dangerApps: List<App>, val spyApps: List<App>, val sentAt: Long,
+                val filters: Filters = Filters())
 
     /** The report. Pure: built from plain values, so it is unit-tested without Android. */
     fun payload(f: Facts): JSONObject = JSONObject().apply {
@@ -188,6 +193,10 @@ object HomeReport {
         })
         put("blocked_today", f.today)
         put("blocked_days", JSONArray(f.days))
+        put("filters", JSONObject().apply {
+            put("family", f.filters.family); put("safe_search", f.filters.safeSearch)
+            put("parent_lock", f.filters.parentLock); put("managed", JSONArray(f.filters.managed))
+        })
         put("since_last", JSONObject().apply {
             put("total", f.since.values.sum())
             put("categories", JSONObject(categories(f.since)))
@@ -397,7 +406,11 @@ object HomeReport {
             since = delta(counts, snapshot),
             dangerApps = named(ctx, AppStats.appsHitting("Dangerous site")),
             spyApps = named(ctx, AppStats.appsHitting("Stalkerware")),
-            sentAt = now)
+            sentAt = now,
+            filters = Filters(
+                family = ctx.getSharedPreferences(FamilyFilter.PREFS, Context.MODE_PRIVATE).getBoolean("on", false),
+                safeSearch = run { SafeSearch.load(ctx); SafeSearch.isOn },
+                parentLock = ParentLock.isOn(ctx), managed = HomeRules.managedFeatures()))
     }
 
     private fun named(ctx: Context, hits: List<Pair<String, Long>>): List<App> = hits.map { (pkg, n) ->

@@ -36,6 +36,8 @@ report once an hour.
                  "blocklist_built": "2026-10-12 04:41:09", "stops_today": 0},
   "blocked_today": 123,
   "blocked_days": [10, 20, 30, 40, 50, 60, 123],
+  "filters": {"family": true, "safe_search": true, "parent_lock": true,
+              "managed": ["family_filter", "safe_search"]},
   "since_last": {
     "total": 53,
     "categories": {"Advertising": 42, "Analytics": 9, "Dangerous site": 2},
@@ -56,6 +58,8 @@ report once an hour.
   the last 30 days: `[name, count, is_browser]`. A browser (`true`) usually
   means a page someone visited, not spyware on the device.
 - `blocked_days` is oldest → newest, today last.
+- `filters` (v1.14.4): whether the family filter, safe search and the parent lock are on, and which of
+  them the home server sets (`managed`) — so a home screen can show a child's device running without them.
 
 **Never in a report:** the sites visited or the domains blocked (Noxa doesn't
 keep them — the live feed is memory only), allowed lookups, the list of
