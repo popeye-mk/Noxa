@@ -60,6 +60,7 @@ class TunnelActivity : Activity() {
             setPadding(dp(20), dp(24), dp(20), dp(24))
         }
 
+        root.addView(BackBar.build(this))
         root.addView(title("Hide my IP"))
         root.addView(muted(
             "Use this on untrusted networks (public Wi-Fi) to hide your real IP. " +

@@ -91,6 +91,7 @@ class AdwareActivity : Activity() {
             setBackgroundResource(R.drawable.bg_main)
             setPadding(dp(20), dp(24), dp(20), dp(24))
         }
+        root.addView(BackBar.build(this))
         root.addView(text("🕵  Find the app behind pop-up ads", 22f, "#FFFFFF", bold = true))
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

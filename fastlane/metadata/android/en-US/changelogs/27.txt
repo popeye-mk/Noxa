@@ -1,0 +1,3 @@
+1.14.3 — a way back on every screen
+
+• A "← Back" row at the top of every screen below the main one. On a tablet or a TV there is no reliable system back, and deeper screens such as "Report to my home server" had no way out. It is focusable, so the TV remote reaches it first.

@@ -50,6 +50,7 @@ class LiveActivity : Activity() {
             setBackgroundResource(R.drawable.bg_main)
             setPadding(dp(20), dp(24), dp(20), dp(12))
         }
+        root.addView(BackBar.build(this))
         root.addView(TextView(this).apply {
             text = "📡  Live"
             setTextColor(Color.WHITE); textSize = 24f
