@@ -232,6 +232,7 @@ class AppsActivity : Activity() {
             "🌍  DNS provider (who answers lookups)",
             "🕵  Find the app behind pop-up ads",
             "🌐  Hide my IP (private tunnel)",
+            "🔄  Check for updates now",
             "⚙  More settings…"
         )
         AlertDialog.Builder(this)
@@ -245,11 +246,21 @@ class AppsActivity : Activity() {
                     4 -> showDnsProviderPicker()
                     5 -> startActivity(Intent(this, AdwareActivity::class.java))
                     6 -> startActivity(Intent(this, TunnelActivity::class.java))
-                    7 -> showMoreMenu()
+                    7 -> checkForUpdatesNow()
+                    8 -> showMoreMenu()
                 }
             }
             .setNegativeButton("Close", null)
             .show()
+    }
+
+    /** 1.14.4: the daily check, right now — "Noxa 1.14.4 is available" or "You have the latest version". */
+    private fun checkForUpdatesNow() {
+        Toast.makeText(this, "Checking the releases page…", Toast.LENGTH_SHORT).show()
+        Thread {
+            val msg = try { AppUpdater.checkNow(this) } catch (e: Exception) { "Couldn't check: ${e.message}" }
+            runOnUiThread { if (!isFinishing) Toast.makeText(this, msg, Toast.LENGTH_LONG).show() }
+        }.start()
     }
 
     private fun showSiteLists() {

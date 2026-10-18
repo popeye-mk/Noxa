@@ -56,6 +56,8 @@ object HomeRules {
 
     fun isBlocked(host: String): Boolean = matches(sites, host) || matches(list, host)
     fun isManaged(feature: String): Boolean = feature in managed
+    /** The features the home server sets on this device (for the report, 1.14.4). */
+    fun managedFeatures(): List<String> = managed.sorted()
     fun blockedCount(): Int = sites.size + list.size
     fun summary(ctx: Context): String {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -1,0 +1,4 @@
+1.14.4 — check for updates now; the report says which filters are on
+
+• Settings & tools → "Check for updates now": the daily check, right away.
+• The home-server report now says whether the family filter, safe search and the parent lock are on, and which rules the home server sets — so one screen at home shows a child's device running without them. Still never the sites visited.

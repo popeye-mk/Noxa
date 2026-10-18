@@ -12,6 +12,20 @@ class HomeReportTest {
     private val hour = 60L * 60 * 1000
     private val now = 1_800_000_000_000L
 
+    @Test fun theReportSaysWhichFiltersAreOn() {                       // 1.14.4
+        val plain = HomeReport.payload(facts()).getJSONObject("filters")
+        assertFalse(plain.getBoolean("family")); assertFalse(plain.getBoolean("safe_search"))
+        assertFalse(plain.getBoolean("parent_lock")); assertEquals(0, plain.getJSONArray("managed").length())
+        val f = facts()
+        val kids = HomeReport.Facts(f.id, f.name, f.model, f.android, f.version, f.protectionOn, f.alwaysOn, f.builtAt,
+            f.stopsToday, f.today, f.days, f.since, f.dangerApps, f.spyApps, f.sentAt,
+            HomeReport.Filters(family = true, safeSearch = true, parentLock = true, managed = listOf("family_filter", "safe_search")))
+        val o = HomeReport.payload(kids).getJSONObject("filters")
+        assertTrue(o.getBoolean("family")); assertTrue(o.getBoolean("safe_search")); assertTrue(o.getBoolean("parent_lock"))
+        assertEquals("family_filter", o.getJSONArray("managed").getString(0))
+        assertFalse(HomeReport.payload(kids).toString().contains("visited"))   // still never the sites
+    }
+
     @Test fun hourlyAndNotTwoTriesWithinTenMinutes() {
         assertTrue(HomeReport.due(now, 0L, 0L))                              // never sent
         assertFalse(HomeReport.due(now, now - 30 * 60 * 1000, 0L))           // sent half an hour ago
