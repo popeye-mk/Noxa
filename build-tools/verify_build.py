@@ -155,6 +155,11 @@ def t_contains(d):
 t_sample = t_domains if len(t_domains) <= 20000 else random.Random(3).sample(t_domains, 20000)
 check("threats: no false negatives (sample)", all(t_contains(d) for d in t_sample))
 t_unblocked = [d for d in t_sample if not blocked(d)]
+# v1.14.5: a well-known service is never "a scam site" (build_blocklist.NEVER_THREAT)
+_brand = ["disneyplus.com", "www.disneyplus.com", "cdn.bamgrid.com", "netflix.com", "youtube.com", "whatsapp.net",
+          "apple.com", "roblox.com", "spotify.com"]
+check("threats: never a well-known service", not any(t_contains(d) for d in _brand),
+      f"{[d for d in _brand if t_contains(d)]!r}")
 check("threats: every entry also blocked by the main filter", not t_unblocked,
       f"{len(t_unblocked)} not blocked, e.g. {t_unblocked[:8]!r}")
 t_rng = random.Random(11); t_fp = 0
