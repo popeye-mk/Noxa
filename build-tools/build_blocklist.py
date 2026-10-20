@@ -144,6 +144,25 @@ ALLOWLIST_DOMAINS = [
 THREAT_CATEGORIES = ["phishing", "malware", "cryptojacking", "ddos", "hacking", "dialer"]
 THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif_mini", "urlhaus"]
 
+# v1.14.5: a well-known service's own domains are never "a scam site". A child's tablet reported Disney+
+# reaching "a known scam or malware server" (20 Oct 2026): one of its servers sat on a threat list. These stay
+# wherever the main filter puts them (an ad or tracker subdomain is still blocked); they only never get the
+# scary label. Brand-owned hosts only — never domains that host other people's content (amazonaws, cloudfront,
+# github.io, …), where a scam subdomain is a real scam.
+NEVER_THREAT = [
+    "disneyplus.com", "disney-plus.net", "bamgrid.com", "dssott.com", "go.com",
+    "netflix.com", "nflxvideo.net", "nflximg.net", "nflxext.com", "nflxso.net",
+    "youtube.com", "googlevideo.com", "ytimg.com", "spotify.com", "scdn.co",
+    "whatsapp.com", "whatsapp.net", "apple.com", "mzstatic.com", "icloud.com",
+    "microsoft.com", "windows.com", "live.com", "office.com", "xbox.com",
+    "playstation.com", "nintendo.net", "roblox.com", "rbxcdn.com",
+]
+
+
+def is_never_threat(domain: str) -> bool:
+    d = domain.lower().strip(".")
+    return any(d == a or d.endswith("." + a) for a in NEVER_THREAT)
+
 # v1.10 optional "Strict scam protection": whole web endings (TLDs) that are
 # mostly used for scams. Shipped as a small text list, applied on the phone
 # ONLY when the user switches it on. These endings are never allowed in it,
@@ -522,6 +541,7 @@ def main():
     for name in THREAT_EXTRA_SOURCES:
         threats.update(read_extra_source(name))
     threats &= all_domains
+    threats = {d for d in threats if not is_never_threat(d)}      # v1.14.5: see NEVER_THREAT
     threats = sorted(threats)
     t_m, t_k = bloom_params(len(threats), FALSE_POSITIVE_RATE)
     write_gbf(os.path.join(OUT, "threats.gbf"), t_m, t_k, len(threats), build_bloom(threats, t_m, t_k))
