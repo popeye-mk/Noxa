@@ -53,6 +53,15 @@ jobs:
           archive: false
           if-no-files-found: error
 
+      # The same file zipped, for the publish job: a non-archived artifact can't be fetched by
+      # download-artifact ("Unable to download and extract", 26 Oct). The plain one above stays for people.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: test-apk-zipped
+          path: noxa-TEST.apk
+          retention-days: 1
+          if-no-files-found: error
+
   # Phone-friendly download, no login needed (public repo):
   #   https://github.com/popeye-mk/Noxa/raw/test-apk/noxa-TEST.apk
   # The test-apk branch holds ONE commit with just the latest test APK
@@ -66,7 +75,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: noxa-TEST.apk
+          name: test-apk-zipped
           path: ${{ runner.temp }}/t
 
       - name: Publish latest test APK to the test-apk branch
