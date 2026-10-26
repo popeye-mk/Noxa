@@ -86,7 +86,19 @@ jobs:
       - name: Verify the APK is signed with the release key
         run: |
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          "$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
+          OUT="$("$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk)"
+          echo "$OUT"
+          # Refuse to publish an APK signed with any key other than THE Noxa
+          # release key: it couldn't install over anyone's Noxa ("package
+          # conflicts"), e.g. after re-entering the secrets in a new repo.
+          # The expected value lives in AppUpdater.RELEASE_CERT_SHA256.
+          WANT="$(grep -A1 'RELEASE_CERT_SHA256 =' app/src/main/java/com/guardian/app/AppUpdater.kt | grep -o '[0-9a-f]\{64\}' | head -1)"
+          GOT="$(echo "$OUT" | grep -i 'Signer #1 certificate SHA-256 digest' | grep -o '[0-9a-f]\{64\}')"
+          if [ -z "$WANT" ] || [ "$GOT" != "$WANT" ]; then
+            echo "::error::Signed with the WRONG key (got '$GOT', expected '$WANT'). Check the NOXA_KEYSTORE_* secrets. Nothing was published."
+            exit 1
+          fi
+          echo "Release key OK ($GOT)"
 
       - name: Remove signing material
         if: always()
