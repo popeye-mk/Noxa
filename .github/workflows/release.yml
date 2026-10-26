@@ -88,15 +88,29 @@ jobs:
 
       - name: Verify the APK is signed with the release key
         run: |
+          # Every way this can go wrong says so, and nothing is published (26 Oct: the first run stopped silently
+          # inside a $(...) under bash -e, with no message at all).
+          set +e
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          OUT="$("$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk)"
+          APK=app/build/outputs/apk/release/app-release.apk
+          echo "build-tools: $BT"; ls -la app/build/outputs/apk/release/
+          if [ ! -f "$APK" ]; then
+            echo "::error::No signed app-release.apk was built — the signing config wasn't used. Nothing was published."; exit 1
+          fi
+          OUT="$("$BT/apksigner" verify --print-certs "$APK" 2>&1)"; RC=$?
           echo "$OUT"
+          if [ $RC -ne 0 ]; then
+            echo "::error::apksigner could not verify the APK (exit $RC, see above). Nothing was published."; exit 1
+          fi
           # Refuse to publish an APK signed with any key other than THE Noxa
           # release key: it couldn't install over anyone's Noxa ("package
           # conflicts"), e.g. after re-entering the secrets in a new repo.
           # The expected value lives in AppUpdater.RELEASE_CERT_SHA256.
           WANT="$(grep -A1 'RELEASE_CERT_SHA256 =' app/src/main/java/com/guardian/app/AppUpdater.kt | grep -o '[0-9a-f]\{64\}' | head -1)"
-          GOT="$(echo "$OUT" | grep -i 'Signer #1 certificate SHA-256 digest' | grep -o '[0-9a-f]\{64\}')"
+          GOT="$(echo "$OUT" | grep -i 'Signer #1 certificate SHA-256 digest' | grep -oi '[0-9a-f]\{64\}' | head -1 | tr 'A-F' 'a-f')"
+          if [ -z "$GOT" ]; then
+            echo "::error::apksigner printed no signer certificate (see above). Nothing was published."; exit 1
+          fi
           if [ -z "$WANT" ] || [ "$GOT" != "$WANT" ]; then
             echo "::error::Signed with the WRONG key (got '$GOT', expected '$WANT'). Check the NOXA_KEYSTORE_* secrets. Nothing was published."
             exit 1
