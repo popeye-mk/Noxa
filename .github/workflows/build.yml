@@ -12,23 +12,25 @@ on:
 permissions:
   contents: read
 
+# Every action is pinned to a commit (a moved tag can't slip code in: tj-actions, March 2025), and the job that
+# runs third-party code (setup-gradle, Gradle plugins) has no write token — publishing is its own small job.
 jobs:
   build:
     runs-on: ubuntu-24.04   # pinned: ubuntu-latest moves to Ubuntu 26 on 2026-10-19
-    permissions:
-      contents: write   # only to replace the test-apk branch (push events)
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Packet-algorithm checks
         run: python3 build-tools/test_packets.py
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
         with:
           # MIT-licensed open-source caching only — no proprietary components
           # in Noxa's build (v6 defaults to a closed-source cache provider).
@@ -45,26 +47,37 @@ jobs:
       - name: Name the test APK
         run: cp app/build/outputs/apk/debug/app-debug.apk noxa-TEST.apk
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           path: noxa-TEST.apk
           archive: false
           if-no-files-found: error
 
-      # Phone-friendly download, no login needed (public repo):
-      #   https://github.com/popeye-mk/Noxa/raw/test-apk/noxa-TEST.apk
-      # The test-apk branch holds ONE commit with just the latest test APK
-      # (replaced each time, so the repo doesn't grow). Never a release.
+  # Phone-friendly download, no login needed (public repo):
+  #   https://github.com/popeye-mk/Noxa/raw/test-apk/noxa-TEST.apk
+  # The test-apk branch holds ONE commit with just the latest test APK
+  # (replaced each time, so the repo doesn't grow). Never a release.
+  publish-test-apk:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # only to replace the test-apk branch
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: noxa-TEST.apk
+          path: ${{ runner.temp }}/t
+
       - name: Publish latest test APK to the test-apk branch
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           SRC: ${{ github.ref_name }}@${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir "$RUNNER_TEMP/t" && cp noxa-TEST.apk "$RUNNER_TEMP/t/"
           cd "$RUNNER_TEMP/t"
           printf 'Latest Noxa TEST build (debug, installs next to Noxa).\nBuilt from %s\n' "$SRC" > README.txt
           git init -q -b test-apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A && git commit -q -m "Test APK from $SRC"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" test-apk
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" test-apk

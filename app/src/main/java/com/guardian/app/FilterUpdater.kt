@@ -70,10 +70,15 @@ object FilterUpdater {
             if (!BloomFilter.isValidFile(gbf))
                 return "Downloaded file was invalid — kept the current list."
             // Integrity: the manifest publishes the filter's SHA-256. A truncated
-            // or corrupted download (or one that raced a new commit) is refused.
+            // or corrupted download (or one that raced a new commit) is refused —
+            // and so is a manifest without one (audit of 26 Oct: no hash, no swap).
             val expected = json.optString("sha256", "")
-            if (expected.isNotEmpty() && !sha256Hex(gbf).equals(expected, ignoreCase = true))
+            if (expected.isEmpty() || !sha256Hex(gbf).equals(expected, ignoreCase = true))
                 return "Downloaded list failed its integrity check — kept the current list."
+            // The phone's own sanity check (FilterSanity): a hollow or wrong list never replaces a good one.
+            val currentItems = try { BloomFilter.loadCurrent(ctx).items } catch (_: Exception) { 0L }
+            if (!FilterSanity.mainOk(BloomFilter.load(gbf.inputStream()), currentItems))
+                return "The new list failed the phone's own checks — kept the current list."
 
             // The stalkerware list rides along (small). Optional: an old manifest
             // without its hash, or a failed download, keeps the current list.
@@ -142,7 +147,7 @@ object FilterUpdater {
     private fun httpGet(url: String): ByteArray? = try {
         val c = URL(url).openConnection() as HttpsURLConnection
         c.connectTimeout = 8000; c.readTimeout = 20000
-        if (c.responseCode != 200) { c.errorStream?.close(); null }
-        else c.inputStream.use { it.readBytes() }
+        if (c.responseCode != 200 || c.contentLengthLong > FilterSanity.MAX_BYTES) { c.errorStream?.close(); null }
+        else c.inputStream.use { FilterSanity.readCapped(it) }
     } catch (e: Exception) { null }
 }

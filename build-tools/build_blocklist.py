@@ -471,7 +471,9 @@ def ensure_ut1_extracted():
                  "at blocklists/ut1/. Download the archive and put it there.")
     print("UT1 not extracted yet — extracting %s ..." % archive)
     with tarfile.open(archive, "r:gz") as tar:
-        tar.extractall(os.path.join(ROOT, "blocklists", "ut1"))
+        # filter="data" (audit of 26 Oct): no "../" names, absolute paths, device files or links out of the
+        # folder — a tampered third-party archive can then not overwrite our own build scripts
+        tar.extractall(os.path.join(ROOT, "blocklists", "ut1"), filter="data")
     print("Extracted.")
 
 

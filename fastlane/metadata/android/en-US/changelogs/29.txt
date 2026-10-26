@@ -1,0 +1,5 @@
+1.14.5 — safer updates and lists
+
+• One-tap update: before the installer opens, the download must be Noxa itself, newer than this copy and signed with the Noxa release key.
+• Blocklist and family filter: the phone checks a new list itself before using it (known trackers blocked, everyday sites like Google and GitHub not, a plausible size). A list that fails keeps the current one.
+• Moving to a new phone no longer copies Noxa's home-server key or parent lock (Android 12+ transfer).

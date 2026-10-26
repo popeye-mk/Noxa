@@ -80,6 +80,8 @@ object FamilyFilter {
         val bytes = httpGet(URL_) ?: return "Couldn't download the family filter."
         if (!BloomFilter.isValidFile(bytes)) return "The downloaded file was invalid — nothing changed."
         if (!sha256Hex(bytes).equals(sha, ignoreCase = true)) return "The download failed its integrity check — nothing changed."
+        if (!FilterSanity.familyOk(BloomFilter.load(bytes.inputStream())))       // audit of 26 Oct
+            return "The downloaded list failed the phone's own checks — nothing changed."
         val tmp = File(ctx.filesDir, "$FILE.tmp")
         tmp.writeBytes(bytes)
         val dst = File(ctx.filesDir, FILE)
@@ -143,7 +145,7 @@ object FamilyFilter {
         val c = URL(url).openConnection() as HttpsURLConnection
         c.connectTimeout = 8000; c.readTimeout = 60000
         c.instanceFollowRedirects = true
-        if (c.responseCode != 200) { c.errorStream?.close(); null }
-        else c.inputStream.use { it.readBytes() }
+        if (c.responseCode != 200 || c.contentLengthLong > FilterSanity.MAX_BYTES) { c.errorStream?.close(); null }
+        else c.inputStream.use { FilterSanity.readCapped(it) }
     } catch (e: Exception) { Log.w(TAG, "family filter download: $e"); null }
 }

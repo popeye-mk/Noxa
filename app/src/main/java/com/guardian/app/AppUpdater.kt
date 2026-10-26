@@ -71,6 +71,36 @@ object AppUpdater {
         return installed.any { norm(it) == want }
     }
 
+    /** Pure, unit-tested (audit of 26 Oct): may this downloaded APK go to the installer? Android already refuses a
+     *  copy signed with another key over Noxa — but an APK with another package name would install as a second app
+     *  through this trusted button, and the .sha256 comes from the same release as the APK. So: our package, newer
+     *  than this copy, signed with our release key. */
+    fun apkAcceptable(pkg: String?, versionCode: Long, certs: List<String>, ourPkg: String, ourVersion: Long): Boolean =
+        pkg == ourPkg && versionCode > ourVersion && matchesReleaseCert(certs, RELEASE_CERT_SHA256)
+
+    /** Package, version code and signing-cert SHA-256s of an APK file that is not installed (null when unreadable). */
+    fun archiveInfo(ctx: Context, path: String): Triple<String, Long, List<String>>? = try {
+        val pm = ctx.packageManager
+        val info = if (android.os.Build.VERSION.SDK_INT >= 28)
+            pm.getPackageArchiveInfo(path, PackageManager.GET_SIGNING_CERTIFICATES)
+        else @Suppress("DEPRECATION") pm.getPackageArchiveInfo(path, PackageManager.GET_SIGNATURES)
+        if (info == null) null else {
+            val sigs = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                val si = info.signingInfo
+                if (si == null) null else if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory
+            } else @Suppress("DEPRECATION") info.signatures
+            val code = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode
+                       else @Suppress("DEPRECATION") info.versionCode.toLong()
+            Triple(info.packageName, code, sigs?.map { sha256Hex(it.toByteArray()) } ?: emptyList())
+        }
+    } catch (e: Exception) { Log.w(TAG, "apk check: $e"); null }
+
+    /** This installed copy's version code. */
+    fun installedVersionCode(ctx: Context): Long = try {
+        val info = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+        if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+    } catch (e: Exception) { Long.MAX_VALUE }        // unsure → nothing counts as newer
+
     fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 

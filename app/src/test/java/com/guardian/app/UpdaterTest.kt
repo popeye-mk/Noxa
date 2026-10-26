@@ -71,4 +71,14 @@ class UpdateFlowTest {
         assertFalse(AppUpdater.shaMatches(h, "cd".repeat(32)))
         assertFalse(AppUpdater.shaMatches("short", "short"))
     }
+
+    @Test fun aDownloadedApkMustBeOursNewerAndSignedWithTheReleaseKey() {
+        val ours = "com.guardian.app"
+        val key = listOf(AppUpdater.RELEASE_CERT_SHA256)
+        assertTrue(AppUpdater.apkAcceptable(ours, 29, key, ours, 28))
+        assertFalse(AppUpdater.apkAcceptable("com.evil.noxa", 29, key, ours, 28))           // a second "Noxa" app
+        assertFalse(AppUpdater.apkAcceptable(ours, 29, listOf("ab".repeat(32)), ours, 28))  // another signing key
+        assertFalse(AppUpdater.apkAcceptable(ours, 28, key, ours, 28))                       // not newer
+        assertFalse(AppUpdater.apkAcceptable(null, 29, key, ours, 28))                       // unreadable file
+    }
 }

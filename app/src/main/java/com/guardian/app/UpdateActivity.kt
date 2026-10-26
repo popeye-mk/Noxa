@@ -24,6 +24,9 @@ import java.security.MessageDigest
  * "Install". The first time, Android asks once to allow Noxa to install
  * updates (Settings → "Install unknown apps").
  *
+ * Before the installer opens, the file must also be our package, newer than this copy and signed
+ * with our release key (AppUpdater.apkAcceptable, audit of 26 Oct).
+ *
  * Only a copy signed with the release key gets here (AppUpdater); F-Droid and
  * TEST builds update from where they came.
  */
@@ -31,6 +34,7 @@ class UpdateActivity : Activity() {
 
     private var downloadId = -1L
     private var expectedSha = ""
+    private var apkName = ""
     private var receiver: BroadcastReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,7 +62,7 @@ class UpdateActivity : Activity() {
             .setDescription("Downloading the update")
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "noxa-$version.apk")
+            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "noxa-$version.apk".also { apkName = it })
         receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, i: Intent) {
                 if (i.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) != downloadId) return
@@ -79,11 +83,11 @@ class UpdateActivity : Activity() {
             val ok = try {
                 dm.openDownloadedFile(downloadId).use { pfd ->
                     java.io.FileInputStream(pfd.fileDescriptor).use { AppUpdater.shaMatches(expectedSha, sha256(it)) }
-                }
+                } && genuine()
             } catch (e: Exception) { Log.w("Guardian", "update check: $e"); false }
             runOnUiThread {
                 if (!ok) {
-                    Toast.makeText(this, "The downloaded file failed its integrity check — not installed.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "The download is not a genuine Noxa update (integrity, signature or version) — not installed.", Toast.LENGTH_LONG).show()
                     dm.remove(downloadId); finish(); return@runOnUiThread
                 }
                 try {
@@ -95,6 +99,15 @@ class UpdateActivity : Activity() {
                 finish()
             }
         }.start()
+    }
+
+    /** Our package, newer, signed with our release key (AppUpdater.apkAcceptable) — before the installer opens. */
+    private fun genuine(): Boolean {
+        val file = java.io.File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), apkName)
+        val (pkg, code, certs) = AppUpdater.archiveInfo(this, file.path) ?: return false
+        val ok = AppUpdater.apkAcceptable(pkg, code, certs, packageName, AppUpdater.installedVersionCode(this))
+        if (!ok) Log.w("Guardian", "update refused: package=$pkg version=$code")
+        return ok
     }
 
     private fun sha256(input: java.io.InputStream): String {
