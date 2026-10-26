@@ -1,0 +1,6 @@
+1.14.6 — a home server that can't be faked
+
+• Report to my home server: reports are signed with the key; the key itself is no longer sent, so no one on the Wi-Fi can copy it.
+• House rules (family filter, safe search, bedtime, blocked sites) are used only from answers signed with the same key. A stranger on the Wi-Fi can't switch them off.
+• "Find my home server" shows the address it found and asks before joining.
+• Own home server script? It must check the signature: docs/HOME-SERVER.md.

@@ -46,15 +46,18 @@ report() {
   dns=$(resolvectl status 2>/dev/null | grep -m1 -E 'Current DNS Server|DNS Servers' | sed 's/.*: *//' || true)
   quad9=$(printf '%s' "$dns" | grep -q -E '9\.9\.9\.9|quad9' && echo true || echo false)
   up=$(awk '{printf "%d", $1/86400}' /proc/uptime)
-  python3 - "$(cat "$CONF/address")" "$(cat "$CONF/key")" "$(device_id)" "$name" "$model" "$os" "$pending" "$security" \
+  # the key file's path, not the key: a command line is visible to every user on the PC
+  python3 - "$(cat "$CONF/address")" "$CONF/key" "$(device_id)" "$name" "$model" "$os" "$pending" "$security" \
     "$reboot" "$firewall" "$auto" "$quad9" "$up" "$VERSION" <<'PY'
-import json, socket, sys, time
-addr, key, did, name, model, os_name, pending, security, reboot, firewall, auto, quad9, up, version = sys.argv[1:]
+import hashlib, hmac, json, socket, sys, time
+addr, keyfile, did, name, model, os_name, pending, security, reboot, firewall, auto, quad9, up, version = sys.argv[1:]
 host, _, port = addr.partition(":")
 port = int(port or 8790)
+did = did.lower()
+now = int(time.time())
 b = lambda s: s == "true"
 body = json.dumps({
-    "format": "noxa-home-report", "version": 1, "sent_at": int(time.time()),
+    "format": "noxa-home-report", "version": 1, "sent_at": now,
     "device": {"id": did, "name": name[:40], "model": model[:40], "android": "", "noxa": version},
     "protection": {"on": b(firewall) and b(auto), "always_on": None, "blocklist_built": "", "stops_today": 0},
     "blocked_today": 0, "blocked_days": [], "since_last": {"total": 0, "categories": {}, "top_companies": []},
@@ -63,8 +66,14 @@ body = json.dumps({
            "reboot_required": b(reboot), "firewall": b(firewall), "auto_updates": b(auto), "quad9": b(quad9),
            "uptime_days": int(up)},
 }).encode()
+# signed like Noxa 1.14.6 (noxa-home-v2, audit of 26 Oct): the key itself never goes on the network
+with open(keyfile) as f:
+    k = hashlib.sha256(f.read().strip().encode()).digest()
+text = "\n".join(["noxa-home-v2", "/api/home/report", did, str(now), hashlib.sha256(body).hexdigest()])
+sig = hmac.new(k, text.encode(), hashlib.sha256).hexdigest()
 req = (f"POST /api/home/report HTTP/1.1\r\nHost: {host}:{port}\r\nUser-Agent: noxa-pc\r\nContent-Type: application/json\r\n"
-       f"X-Home-Key: {key}\r\nContent-Length: {len(body)}\r\nConnection: close\r\n\r\n").encode() + body
+       f"X-Home-Device: {did}\r\nX-Home-Time: {now}\r\nX-Home-Sig: {sig}\r\n"
+       f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n").encode() + body
 s = socket.create_connection((host, port), timeout=8)
 s.sendall(req); data = b""
 while len(data) < 65536:
@@ -84,6 +93,7 @@ discover_and_join() {
 import json, re, socket, sys
 name, address, key, did, dport = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
 private = lambda ip: re.match(r"^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)", ip) is not None
+discovered = False
 if not address:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1); s.settimeout(3)
     s.sendto(b"NOXA-HOME?", ("255.255.255.255", dport))
@@ -92,7 +102,7 @@ if not address:
             data, (ip, _) = s.recvfrom(256)
             text = data.decode("ascii", "replace").strip()
             if text.startswith("NOXA-HOME ") and private(ip):
-                address = text[len("NOXA-HOME "):].strip(); break
+                address = text[len("NOXA-HOME "):].strip(); discovered = True; break
     except socket.timeout:
         pass
     s.close()
@@ -101,6 +111,15 @@ if not address:
 host, _, port = address.partition(":"); port = int(port or 8790)
 if not private(host):
     print("NOT_HOME"); sys.exit(0)
+if discovered and not key:              # like the app (audit of 26 Oct): the first answer could be any device on the Wi-Fi
+    try:
+        with open("/dev/tty", "r+") as tty:
+            tty.write(f"    Found a home server at {address}. Is that your home server? Join it? [y/N] "); tty.flush()
+            ok = tty.readline().strip().lower() in ("y", "yes")
+    except OSError:
+        ok = False
+    if not ok:
+        print("NOT_CONFIRMED"); sys.exit(0)
 if not key:
     body = json.dumps({"format": "noxa-home-join", "device": {"id": did, "name": name[:40], "model": "Linux PC"}}).encode()
     req = (f"POST /api/home/join HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Type: application/json\r\n"
@@ -147,6 +166,7 @@ setup() {
           say "    joined $address as \"$name\"" ;;
     NO_SERVER) say "    no home server answered on this network. Is its door open? Or give --address and --key."; exit 1 ;;
     NOT_HOME)  say "    that address is not a home address."; exit 1 ;;
+    NOT_CONFIRMED) say "    not joined. Run again and answer y, or give --address."; exit 1 ;;
     NO_ANSWER*) say "    no answer from ${result#NO_ANSWER }."; exit 1 ;;
     REFUSED*)  say "    ${result#REFUSED }"; exit 1 ;;
   esac

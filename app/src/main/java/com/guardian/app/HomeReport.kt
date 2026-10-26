@@ -13,6 +13,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * v1.14 "Report to my home server" — OFF by default, one tap deeper (More settings).
@@ -34,9 +35,13 @@ import java.util.UUID
  *
  * Only on Wi-Fi/Ethernet (never mobile data), never in tunnel mode, only to a
  * private (home) address typed by the user, never a name (nothing is looked
- * up), at most ~4 KB, with the key in a header. Plain HTTP on the home network:
- * the manifest keeps cleartext traffic off for the whole app, so this uses its
- * own small HTTP-over-socket sender instead of switching that policy on.
+ * up), at most ~4 KB. Plain HTTP on the home network: the manifest keeps
+ * cleartext traffic off for the whole app, so this uses its own small
+ * HTTP-over-socket sender instead of switching that policy on.
+ *
+ * 1.14.6 (audit of 26 Oct): every keyed call is signed with the key and the key
+ * itself never travels; rules, the home list and backups are taken only from
+ * answers the home server signed with the same key (HomeSig).
  */
 object HomeReport {
     const val PREFS = "guardian_home"
@@ -54,7 +59,6 @@ object HomeReport {
     const val PATH = "/api/home/report"
     const val JOIN_PATH = "/api/home/join"
     const val DISCOVERY_PORT = 8791
-    const val HEADER = "X-Home-Key"
     const val INTERVAL_MS = 60L * 60 * 1000          // one report an hour
     const val MIN_TRY_GAP_MS = 10L * 60 * 1000       // after a failure: not again within 10 min
     const val MAX_BODY = 24576                         // a report (~2 KB), plus the settings backup when it changed
@@ -210,12 +214,21 @@ object HomeReport {
     private fun apps(list: List<App>) =
         JSONArray(list.take(5).map { JSONArray(listOf(it.name.take(40), it.count, it.browser)) })
 
-    /** The HTTP request bytes (HTTP/1.1, one shot, connection closed by the server). No key = no key header. */
-    fun request(host: String, port: Int, key: String, body: ByteArray, path: String = PATH): ByteArray {
+    /** A request's bytes and its signature (the answer is checked against it); "" for the unsigned join. */
+    class Request(val bytes: ByteArray, val sig: String)
+
+    /** The HTTP request bytes (HTTP/1.1, one shot, connection closed by the server).
+     *  1.14.6 (audit of 26 Oct): with a key the request is signed with it (HomeSig) and the key itself never
+     *  goes in — anyone else on the Wi-Fi could read a plain header. No key = the join (there is no key yet). */
+    fun request(host: String, port: Int, body: ByteArray, path: String = PATH,
+                key: String = "", deviceId: String = "", timeSec: Long = 0L): Request {
+        val sig = if (key.isEmpty()) "" else HomeSig.requestSig(HomeSig.hmacKey(key), path, deviceId, timeSec, body)
+        val signed = if (sig.isEmpty()) "" else
+            "${HomeSig.DEVICE}: ${deviceId.lowercase()}\r\n${HomeSig.TIME}: $timeSec\r\n${HomeSig.SIG}: $sig\r\n"
         val head = "POST $path HTTP/1.1\r\nHost: $host:$port\r\nUser-Agent: Noxa\r\n" +
-            "Content-Type: application/json\r\n" + (if (key.isEmpty()) "" else "$HEADER: $key\r\n") +
+            "Content-Type: application/json\r\n" + signed +
             "Content-Length: ${body.size}\r\nConnection: close\r\n\r\n"
-        return head.toByteArray(Charsets.ISO_8859_1) + body
+        return Request(head.toByteArray(Charsets.ISO_8859_1) + body, sig)
     }
 
     /** The status code of an HTTP reply, or -1 if it isn't one. */
@@ -223,6 +236,12 @@ object HomeReport {
         Regex("^HTTP/1\\.[01] (\\d{3})").find(reply)?.groupValues?.get(1)?.toInt() ?: -1
 
     fun bodyOf(reply: String): String = reply.substringAfter("\r\n\r\n", "")
+
+    /** Did the home server sign [reply] — its status and exact body — with [key], for the request [requestSig]?
+     *  The reply was read as ISO-8859-1, so turning the body back into ISO-8859-1 gives the exact bytes. */
+    fun signedBy(key: String, requestSig: String, reply: String): Boolean =
+        key.isNotEmpty() && HomeSig.verifyReply(HomeSig.hmacKey(key), requestSig, statusOf(reply),
+            bodyOf(reply).toByteArray(Charsets.ISO_8859_1), HomeSig.header(reply, HomeSig.REPLY_SIG))
 
     // --- finding the server and joining (no typing) ------------------------------
     /** Pure: "NOXA-HOME 192.168.1.20:8790" → the address, when it is a home address. */
@@ -264,7 +283,7 @@ object HomeReport {
             put("format", "noxa-home-join")
             put("device", JSONObject().apply { put("id", id(ctx)); put("name", name(ctx).take(40)); put("model", (Build.MODEL ?: "").take(40)) })
         }.toString().toByteArray(Charsets.UTF_8)
-        val reply = try { exchange(target, request(target.host, target.port, "", body, JOIN_PATH)) }
+        val reply = try { exchange(target, request(target.host, target.port, body, JOIN_PATH).bytes) }
             catch (e: Exception) { return "No answer from ${target.host}:${target.port} — is the home server on?" }
         val json = try { JSONObject(bodyOf(reply)) } catch (_: Exception) { JSONObject() }
         return when (statusOf(reply)) {
@@ -290,9 +309,9 @@ object HomeReport {
     fun backups(ctx: Context): List<Backup>? {
         val target = parseAddress(address(ctx)) ?: return null
         val body = JSONObject().put("device", JSONObject().put("id", id(ctx))).toString().toByteArray(Charsets.UTF_8)
-        val reply = try { exchange(target, request(target.host, target.port, key(ctx), body, "/api/home/backups")) } catch (_: Exception) { return null }
-        if (statusOf(reply) != 200) return null
-        val arr = try { JSONObject(bodyOf(reply)).optJSONArray("backups") } catch (_: Exception) { null } ?: return emptyList()
+        val answer = try { exchangeSigned(ctx, target, body, "/api/home/backups") } catch (_: Exception) { return null }
+        if (statusOf(answer.reply) != 200 || !answer.signed) return null     // 1.14.6: only a signed list counts
+        val arr = try { JSONObject(bodyOf(answer.reply)).optJSONArray("backups") } catch (_: Exception) { null } ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { Backup(it.optString("id"), it.optString("name"), it.optString("when")) } }
     }
 
@@ -300,10 +319,12 @@ object HomeReport {
     fun restore(ctx: Context, backupId: String): String {
         val target = parseAddress(address(ctx)) ?: return "That isn't a home address."
         val body = JSONObject().put("device", JSONObject().put("id", id(ctx))).put("id", backupId).toString().toByteArray(Charsets.UTF_8)
-        val reply = try { exchange(target, request(target.host, target.port, key(ctx), body, "/api/home/backup")) }
+        val answer = try { exchangeSigned(ctx, target, body, "/api/home/backup") }
             catch (_: Exception) { return "No answer from ${target.host}:${target.port}." }
-        if (statusOf(reply) != 200) return "The home server has no backup for that device."
-        val settings = try { JSONObject(bodyOf(reply)).optString("settings") } catch (_: Exception) { "" }
+        if (statusOf(answer.reply) != 200) return "The home server has no backup for that device."
+        // 1.14.6: settings go into this device only from an answer signed with its key, never a stranger's
+        if (!answer.signed) return "The answer wasn't signed with this device's key — nothing was restored."
+        val settings = try { JSONObject(bodyOf(answer.reply)).optString("settings") } catch (_: Exception) { "" }
         if (settings.isBlank()) return "The backup was empty."
         return try { AppStats.importSettings(ctx, settings) } catch (e: IllegalArgumentException) { e.message ?: "That wasn't a Noxa backup." }
     }
@@ -338,26 +359,34 @@ object HomeReport {
         if (sendBackup) json.put("settings_backup", backup)
         val body = json.toString().toByteArray(Charsets.UTF_8)
         if (body.size > MAX_BODY) return remember(ctx, "The report came out too large — not sent.")
-        val reply = try {
-            exchange(target, request(target.host, target.port, key, body))
+        val answer = try {
+            exchangeSigned(ctx, target, body, PATH, now = now)
         } catch (e: Exception) {
             Log.w(TAG, "home report: $e")
             return remember(ctx, "No answer from ${target.host}:${target.port} — is the home server on and on this Wi-Fi?")
         }
+        val reply = answer.reply
         return when (val code = statusOf(reply)) {
             200 -> {
                 p.edit().putLong(KEY_LAST_SENT, now)
                     .putString(KEY_SNAPSHOT, JSONObject(AppStats.globalCompanyCounts()).toString()).apply()
                 if (sendBackup) p.edit().putString(KEY_BACKUP_SENT, backupHash).apply()
+                // 1.14.6 (audit of 26 Oct): rules only from an answer signed with this device's key. An unsigned
+                // OK still counts as sent (simple receivers keep working), but its rules are ignored, and the
+                // rules already here stay — a stranger can't switch the family filter off, nor clear it.
+                if (!answer.signed)
+                    return remember(ctx, "Sent at ${time(now)}, but the answer wasn't signed with this device's key, " +
+                        "so any house rules in it were ignored.")
                 try {                                           // the answer may carry rules for this device
-                    val answer = JSONObject(bodyOf(reply))
-                    HomeRules.apply(ctx, answer.optJSONObject("rules"), answer.optString("home_list_version"))
+                    val json = JSONObject(bodyOf(reply))
+                    HomeRules.apply(ctx, json.optJSONObject("rules"), json.optString("home_list_version"))
                 } catch (e: Exception) { Log.w(TAG, "home rules: $e") }
                 remember(ctx, "Sent at ${time(now)} — the home server said OK." +
                     (if (HomeRules.blockedCount() > 0 || HomeRules.isManaged("bedtime") || HomeRules.isManaged("safe_search") ||
                          HomeRules.isManaged("family_filter")) " " + HomeRules.summary(ctx) else ""))
             }
-            401, 403 -> remember(ctx, "The home server refused the key — check it.")
+            // a signed request also fails when the device's clock is far off (the server allows 15 minutes)
+            401, 403 -> remember(ctx, "The home server refused the key — check it, and that this device's date and time are right.")
             -1 -> remember(ctx, "Something at ${target.host}:${target.port} answered, but not a home server.")
             429 -> remember(ctx, "Too soon — the home server just got a report from this device. Try again in a moment.")
             else -> remember(ctx, "The home server answered with error $code.")
@@ -426,6 +455,29 @@ object HomeReport {
     } catch (_: Exception) { false }
 
     private fun exchange(t: Target, req: ByteArray): String = exchangeWith(t, req, MAX_REPLY)
+
+    /** A keyed call's reply, and whether the home server signed it with this device's key. */
+    class Answer(val reply: String, val signed: Boolean)
+
+    private val lastSignTime = AtomicLong(0L)
+
+    /** Unix seconds for a signature, never the same twice: two calls in one second with the same body (a double
+     *  tap) would sign alike, and the home server refuses a signature it has already seen. The bump never runs more
+     *  than a minute ahead of the clock: after a wrong date is put right, signing follows the real time again. */
+    fun signTime(nowMs: Long): Long {
+        val s = nowMs / 1000
+        return lastSignTime.updateAndGet { if (it >= s && it < s + 60) it + 1 else s }
+    }
+
+    /** One keyed call (report, list, backups, backup): signed going out, the answer's signature checked.
+     *  MUST be called off the main thread. */
+    fun exchangeSigned(ctx: Context, t: Target, body: ByteArray, path: String, maxReply: Int = MAX_REPLY,
+                       now: Long = System.currentTimeMillis()): Answer {
+        val key = key(ctx)
+        val req = request(t.host, t.port, body, path, key, id(ctx), signTime(now))
+        val reply = exchangeWith(t, req.bytes, maxReply)
+        return Answer(reply, signedBy(key, req.sig, reply))
+    }
 
     /** One HTTP exchange over a plain socket (the home network only); the reply capped at [maxReply]. */
     fun exchangeWith(t: Target, req: ByteArray, maxReply: Int): String = Socket().use { s ->

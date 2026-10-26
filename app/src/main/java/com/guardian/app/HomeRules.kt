@@ -15,7 +15,8 @@ import java.io.File
  * device: blocked sites win even over the device's Allowed sites; a flag the
  * server sets is shown as "set by your home server" in its menu. The home list
  * is fetched only when its version changed. Nothing here talks to anything but
- * the home server the user chose (docs/HOME-SERVER.md).
+ * the home server the user chose (docs/HOME-SERVER.md). Since 1.14.6 rules and
+ * the list come only from answers signed with this device's key (HomeSig).
  */
 object HomeRules {
     const val PREFS = "guardian_home_rules"
@@ -120,9 +121,11 @@ object HomeRules {
         val target = HomeReport.parseAddress(HomeReport.address(ctx)) ?: return
         val body = JSONObject().apply { put("device", JSONObject().put("id", HomeReport.installId(ctx))) }
             .toString().toByteArray(Charsets.UTF_8)
-        val reply = HomeReport.exchangeWith(target, HomeReport.request(target.host, target.port, HomeReport.key(ctx), body, LIST_PATH), MAX_LIST_REPLY)
-        if (HomeReport.statusOf(reply) != 200) return
-        val json = JSONObject(HomeReport.bodyOf(reply))
+        val answer = HomeReport.exchangeSigned(ctx, target, body, LIST_PATH, MAX_LIST_REPLY)
+        if (HomeReport.statusOf(answer.reply) != 200) return
+        // 1.14.6 (audit of 26 Oct): the list blocks sites on this device, so only a list signed with its key counts
+        if (!answer.signed) { Log.w(TAG, "home list: the answer wasn't signed, not used"); return }
+        val json = JSONObject(HomeReport.bodyOf(answer.reply))
         val arr = json.optJSONArray("domains") ?: return
         val domains = (0 until minOf(arr.length(), 50_000)).mapNotNull { AppStats.cleanDomain(arr.optString(it)) }
         val tmp = File(ctx.filesDir, "$LIST_FILE.tmp")

@@ -111,11 +111,14 @@ class HomeReportTest {
         assertTrue(text.toByteArray().size < HomeReport.MAX_BODY)
     }
 
-    @Test fun theRequestIsOneShotHttpWithTheKeyInAHeader() {
+    @Test fun theRequestIsOneShotHttpSignedAndNeverCarriesTheKey() {     // 1.14.6
         val body = "{}".toByteArray()
-        val req = String(HomeReport.request("192.168.1.20", 8790, "home-Abc123xyz", body), Charsets.ISO_8859_1)
+        val r = HomeReport.request("192.168.1.20", 8790, body, key = "home-Abc123xyz",
+            deviceId = "11111111-2222-3333-4444-555555555555", timeSec = 1_800_000_000L)
+        val req = String(r.bytes, Charsets.ISO_8859_1)
         assertTrue(req.startsWith("POST ${HomeReport.PATH} HTTP/1.1\r\nHost: 192.168.1.20:8790\r\n"))
-        assertTrue(req.contains("\r\n${HomeReport.HEADER}: home-Abc123xyz\r\n"))
+        assertTrue(req.contains("\r\nX-Home-Sig: ${r.sig}\r\n"))
+        assertFalse(req.contains("X-Home-Key")); assertFalse(req.contains("home-Abc123xyz"))
         assertTrue(req.contains("\r\nContent-Length: 2\r\n"))
         assertTrue(req.contains("\r\nConnection: close\r\n"))
         assertTrue(req.endsWith("\r\n\r\n{}"))
@@ -139,9 +142,11 @@ class HomeJoinTest {
     }
 
     @Test fun theJoinRequestCarriesNoKeyAndGoesToTheJoinPath() {
-        val req = String(HomeReport.request("192.168.1.20", 8790, "", "{}".toByteArray(), HomeReport.JOIN_PATH), Charsets.ISO_8859_1)
+        val r = HomeReport.request("192.168.1.20", 8790, "{}".toByteArray(), HomeReport.JOIN_PATH)
+        val req = String(r.bytes, Charsets.ISO_8859_1)
         assertTrue(req.startsWith("POST /api/home/join HTTP/1.1\r\n"))
-        assertFalse(req.contains(HomeReport.HEADER))
+        assertFalse(req.contains("X-Home-Key")); assertFalse(req.contains("X-Home-Sig"))   // no key yet: unsigned
+        assertEquals("", r.sig)
         assertTrue(req.endsWith("\r\n\r\n{}"))
     }
 }

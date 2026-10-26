@@ -136,20 +136,47 @@ class HomeActivity : Activity() {
         status.text = "Looking for a home server on this Wi-Fi…"
         Thread {
             val addr = HomeReport.discover()
-            val result = if (addr == null) "No home server answered on this Wi-Fi. Is it on, and is its door open? You can also type the address below."
-                         else HomeReport.join(this, addr)
             runOnUiThread {
-                address.setText(HomeReport.address(this)); key.setText(HomeReport.key(this))
-                onSwitch.setOnCheckedChangeListener(null); onSwitch.isChecked = HomeReport.isOn(this)
-                onSwitch.setOnCheckedChangeListener { _, on ->
-                    if (on && !save()) { onSwitch.isChecked = false; return@setOnCheckedChangeListener }
-                    HomeReport.setOn(this, on); if (on) sendNow() else showStatus()
+                when {
+                    addr == null -> joined("No home server answered on this Wi-Fi. Is it on, and is its door open? You can also type the address below.")
+                    isFinishing || isDestroyed -> joining = false
+                    else -> confirmJoin(addr)
                 }
-                status.text = result
-                joining = false
-                if (result.startsWith("Joined")) showStatus(result)       // the join already sent the first report
             }
         }.start()
+    }
+
+    /** 1.14.6 (audit of 26 Oct): anything on the Wi-Fi can answer the broadcast, and the first answer wins —
+     *  so the user checks the address before Noxa joins it and takes a key from it. */
+    private fun confirmJoin(addr: String) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Join this home server?")
+            .setMessage("Found a home server at $addr. Check that this is your home server's address, then tap Join.")
+            .setPositiveButton("Join") { _, _ -> join(addr) }
+            .setNegativeButton("Cancel") { _, _ -> joined("Not joined.") }
+            .setOnCancelListener { joined("Not joined.") }
+            .show()
+    }
+
+    private fun join(addr: String) {
+        status.text = "Joining $addr…"
+        Thread {
+            val result = HomeReport.join(this, addr)
+            runOnUiThread { joined(result) }
+        }.start()
+    }
+
+    /** Back on the main thread: show what the join did, and the saved address, key and switch. */
+    private fun joined(result: String) {
+        address.setText(HomeReport.address(this)); key.setText(HomeReport.key(this))
+        onSwitch.setOnCheckedChangeListener(null); onSwitch.isChecked = HomeReport.isOn(this)
+        onSwitch.setOnCheckedChangeListener { _, on ->
+            if (on && !save()) { onSwitch.isChecked = false; return@setOnCheckedChangeListener }
+            HomeReport.setOn(this, on); if (on) sendNow() else showStatus()
+        }
+        status.text = result
+        joining = false
+        if (result.startsWith("Joined")) showStatus(result)       // the join already sent the first report
     }
 
     private fun restoreFromServer() {
