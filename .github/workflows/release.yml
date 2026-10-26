@@ -39,7 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref != '' && inputs.ref || inputs.tag) || github.ref }}
+          # an empty "ref" builds the tag itself — by its full name: checkout's short-name lookup failed on 26 Oct
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref != '' && inputs.ref || format('refs/tags/{0}', inputs.tag)) || github.ref }}
           persist-credentials: false
 
       - name: Check signing secrets are set
