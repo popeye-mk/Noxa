@@ -57,7 +57,24 @@ get "https://phishing.army/download/phishing_army_blocklist_extended.txt"       
 # malware / phishing / scam / C2 feeds — sized for phones).
 get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/tif.mini.txt"     "hagezi/tif_mini.txt"
 # abuse.ch URLhaus: hosts serving malware downloads right now (small, fresh).
-get "https://urlhaus.abuse.ch/downloads/hostfile/"                                           "urlhaus/hostfile.txt"
+# Since Oct 2026 the keyless hostfile is gone (410); the feed is a CSV export
+# behind a free abuse.ch Auth-Key (repo secret ABUSECH_AUTH_KEY). The key sits
+# in the URL, so the URL is NEVER printed. No key = skipped, build goes on.
+if [ -n "${ABUSECH_AUTH_KEY:-}" ]; then
+  mkdir -p "$BL/urlhaus"
+  if curl -fsSL --retry 3 --retry-delay 5 --max-time 300 -A "Noxa-blocklist-builder" \
+       -o "$BL/urlhaus/recent.csv.part" \
+       "https://urlhaus-api.abuse.ch/v2/files/exports/${ABUSECH_AUTH_KEY}/recent.csv" 2>/dev/null \
+     && python3 "$ROOT/build-tools/urlhaus_to_hosts.py" "$BL/urlhaus/recent.csv.part" "$BL/urlhaus/hostfile.txt"; then
+    printf '  ok    %-40s %8s lines\n' "urlhaus/hostfile.txt" "$(wc -l < "$BL/urlhaus/hostfile.txt")"
+  else
+    printf '  FAIL  urlhaus/hostfile.txt  (abuse.ch export; check the ABUSECH_AUTH_KEY secret)\n'
+    failed+=("urlhaus/hostfile.txt")
+  fi
+  rm -f "$BL/urlhaus/recent.csv.part"
+else
+  echo "  skip  urlhaus/hostfile.txt  (no ABUSECH_AUTH_KEY secret; see docs/FDROID-AND-RELEASE.md)"
+fi
 # HaGeZi "Most Abused TLDs" (no-exclusions version): the web endings scammers
 # use most. NOT added to the main filter — it powers the optional
 # "Strict scam protection" switch in the app (off by default).

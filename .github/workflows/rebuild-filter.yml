@@ -38,6 +38,8 @@ jobs:
           persist-credentials: false
 
       - name: Download source lists
+        env:
+          ABUSECH_AUTH_KEY: ${{ secrets.ABUSECH_AUTH_KEY }}   # optional, for URLhaus
         run: bash build-tools/fetch_sources.sh
 
       - name: Build filter
