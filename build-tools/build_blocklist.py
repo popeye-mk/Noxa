@@ -142,7 +142,7 @@ ALLOWLIST_DOMAINS = [
 # filter (so it's blocked either way); the app uses this one only to tell the
 # user WHY — "that link is a known scam site" — instead of a silent failure.
 THREAT_CATEGORIES = ["phishing", "malware", "cryptojacking", "ddos", "hacking", "dialer"]
-THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif_mini", "urlhaus"]
+THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif_mini", "urlhaus", "metamask"]
 
 # v1.14.5: a well-known service's own domains are never "a scam site". A child's tablet reported Disney+
 # reaching "a known scam or malware server" (20 Oct 2026): one of its servers sat on a threat list. These stay
@@ -269,6 +269,11 @@ EXTRA_SOURCES = {
     # v1.10 stronger malware protection (also feed the dangerous-site alert):
     "hagezi_tif_mini": ("blocklists/hagezi/tif_mini.txt",     "adblock"),  # threat intel
     "urlhaus":        ("blocklists/urlhaus/hostfile.txt",     "hosts"),    # malware hosts
+    # Nov 2026: MetaMask's eth-phishing-detect — fake wallets, fake NFT/DeFi sites,
+    # "connect your wallet" traps (~114k). Only ~2% were already covered by the
+    # lists above. Shared platforms (github.io, blogspot…) appear only as the one
+    # scam subdomain, never as the platform itself.
+    "metamask":       ("blocklists/metamask/config.json",     "metamask"), # crypto scams
 }
 
 
@@ -415,6 +420,27 @@ def read_domains(path):
     return out
 
 
+def read_metamask(path):
+    """MetaMask eth-phishing-detect config.json: the "blacklist" minus MetaMask's
+    own "whitelist" (and anything under a whitelisted domain). Bad JSON = []."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        return []
+    white = {normalize(w) for w in cfg.get("whitelist", []) if isinstance(w, str)} - {None}
+    out = []
+    for d in cfg.get("blacklist", []):
+        d = normalize(d) if isinstance(d, str) else None
+        if not d:
+            continue
+        p = d.split(".")
+        if any(".".join(p[i:]) in white for i in range(len(p) - 1)):
+            continue
+        out.append(d)
+    return out
+
+
 def read_extra_source(name):
     rel, fmt = EXTRA_SOURCES[name]
     path = os.path.join(ROOT, rel)
@@ -424,6 +450,8 @@ def read_extra_source(name):
         return read_hosts(path)
     if fmt == "domains":
         return read_domains(path)
+    if fmt == "metamask":
+        return read_metamask(path)
     return read_adblock(path)
 
 

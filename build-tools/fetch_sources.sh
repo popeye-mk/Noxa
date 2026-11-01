@@ -75,6 +75,8 @@ if [ -n "${ABUSECH_AUTH_KEY:-}" ]; then
 else
   echo "  skip  urlhaus/hostfile.txt  (no ABUSECH_AUTH_KEY secret; see docs/FDROID-AND-RELEASE.md)"
 fi
+# MetaMask eth-phishing-detect: crypto-scam and wallet-phishing domains (JSON).
+get "https://raw.githubusercontent.com/MetaMask/eth-phishing-detect/main/src/config.json"     "metamask/config.json"
 # HaGeZi "Most Abused TLDs" (no-exclusions version): the web endings scammers
 # use most. NOT added to the main filter — it powers the optional
 # "Strict scam protection" switch in the app (off by default).
