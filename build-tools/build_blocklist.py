@@ -115,6 +115,11 @@ ALLOWLIST_DOMAINS = [
     # every browser falls back to normal DNS, which we filter. Users who really
     # want one can un-block it with the in-app allowlist.
     "quad9.net",
+    # Shared services whose pages differ only by PATH (sites.google.com/view/…):
+    # DNS can't tell one page from another, so a list naming the host would
+    # block every page on it. MetaMask's list named sites.google.com (Nov 2026)
+    # and verify_build.py rightly refused the build.
+    "sites.google.com", "docs.google.com", "drive.google.com",
     # Network connectivity / captive-portal checks — blocking these makes the OS
     # think there's "no internet" even when there is. Defensive: never sinkhole.
     "connectivitycheck.gstatic.com",
