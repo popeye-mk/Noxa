@@ -1,0 +1,5 @@
+1.15 — ready for Android 15, 16 and 17
+
+• Built for the newest Android rules: screens fit neatly between the status bar, the navigation bar and the keyboard on new phones, and the new back gesture works everywhere.
+• Hide my IP: newer WireGuard engine, ready for phones with 16 KB memory pages, with the latest fixes.
+• Behind the scenes: a broken blocklist source is now reported automatically, and MetaMask's crypto-scam list (about 113,000 sites) joined the weekly list.

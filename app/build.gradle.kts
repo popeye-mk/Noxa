@@ -16,15 +16,16 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.guardian.app"
-    compileSdk = 36        // build against the current platform; targetSdk stays
-                           // 34 until the newer runtime rules are tested on device
+    compileSdk = 36        // build against the current platform
 
     defaultConfig {
         applicationId = "com.guardian.app"
         minSdk = 24            // Android 7.0 — covers ~99% of devices
-        targetSdk = 34
-        versionCode = 30
-        versionName = "1.14.6"
+        // Android 16 rules (v1.15): edge-to-edge (EdgeToEdge.kt), predictive back (no screen
+        // overrides back), same-app intents unaffected by the stricter intent matching.
+        targetSdk = 36
+        versionCode = 31
+        versionName = "1.15"
     }
 
     signingConfigs {
