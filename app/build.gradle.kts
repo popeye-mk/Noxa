@@ -101,11 +101,11 @@ dependencies {
     // Unit tests (app/src/test) — run by CI on every push: ./gradlew testDebugUnitTest
     testImplementation("junit:junit:4.13.2")
     // The real org.json for tests (the Android stub jar's JSONObject is empty).
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
     // Tunnel (option 2): the official WireGuard library — Guardian's FIRST
     // third-party dependency. Used now to parse/validate a pasted config, and
     // to establish the tunnel in a later increment. It's open source, which
     // keeps the "provable, auditable, free" story intact.
-    implementation("com.wireguard.android:tunnel:1.0.20230706")
+    implementation("com.wireguard.android:tunnel:1.0.20260102")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

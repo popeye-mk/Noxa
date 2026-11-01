@@ -70,6 +70,15 @@ jobs:
           echo "### New filter" >> "$GITHUB_STEP_SUMMARY"
           python3 -c "import json;m=json.load(open('build-tools/out/manifest.json'));print(f\"{m['unique_domains']:,} domains, built {m['built_at']} UTC\")" >> "$GITHUB_STEP_SUMMARY"
 
+      # Never blocks the build: lists a source that delivered nothing or lost
+      # over half its domains (e.g. a changed download). On main, "publish"
+      # opens a GitHub issue from it, so the owner hears about it.
+      - name: Source health (did a list source break?)
+        run: >
+          python3 build-tools/source_health.py build-tools/out/manifest.json
+          app/src/main/assets/blocklist-manifest.json build-tools/out/source-health.txt
+          | tee -a "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: rebuilt-filter
@@ -81,6 +90,7 @@ jobs:
             build-tools/out/threats.gbf
             build-tools/out/risky-tlds.txt
             build-tools/out/family.gbf
+            build-tools/out/source-health.txt
           if-no-files-found: warn
 
   publish:
@@ -89,6 +99,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write   # commit the verified filter, publish the family filter
+      issues: write     # report a broken list source (source-health.txt)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -129,3 +140,19 @@ jobs:
             --title "Family filter (rolling, not an app release)" --prerelease --latest=false \
             --notes "The optional family filter (adult, gambling, dating categories), rebuilt weekly. Noxa downloads it by itself when the Family filter is switched on. Not an app release."
           gh release upload family-filter build-tools/out/family.gbf --clobber
+
+      - name: Report broken list sources (GitHub issue)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f=build-tools/out/source-health.txt
+          if [ ! -s "$f" ]; then echo "All list sources delivered as usual."; exit 0; fi
+          title="Blocklist source problem"
+          {
+            printf 'The weekly blocklist rebuild on %s found list sources that look broken:\n\n' "$(date -u +%F)"
+            sed 's/^/- /' "$f"
+            printf '\nThe new list still shipped (every safety check passed), just without what these sources normally add. '
+            printf 'Check their downloads in build-tools/fetch_sources.sh.\n'
+          } > issue.md
+          n=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+          if [ -n "$n" ]; then gh issue comment "$n" --body-file issue.md; else gh issue create --title "$title" --body-file issue.md; fi

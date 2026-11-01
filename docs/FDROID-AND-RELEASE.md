@@ -95,6 +95,15 @@ is never printed: `build-tools/urlhaus_to_hosts.py` turns the export into a
 hosts file, keeping only online malware hosts and never shared platforms
 (GitHub, Google Drive, Dropbox, Discord...).
 
+## When a list source breaks
+
+Every weekly rebuild compares each list source with last week
+(`build-tools/source_health.py`). If one delivers nothing or loses more
+than half its domains, the rebuild still ships (if every safety check
+passes) but opens a GitHub issue **"Blocklist source problem"** naming the
+source, so GitHub notifies you. Usually the source changed its download
+address; fix it in `build-tools/fetch_sources.sh`.
+
 ## Every release — manually on a PC (the old way, still works)
 
 1. Bump `versionCode` (+1, always) and `versionName` in
