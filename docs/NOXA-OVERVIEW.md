@@ -38,7 +38,7 @@ there is something to do.
 | Risky web endings (`.top`, `.xyz`, …) | 127 endings | only with *Strict scam protection* |
 | **Family filter** (adult, gambling, dating) | **4,672,103** | only when switched on |
 
-The main list merges 12 public lists, 1,789,388 entries in total before
+The main list merges 12 public lists (MetaMask's makes 13 from the next weekly build), 1,789,388 entries in total before
 removing duplicates:
 
 | Source | Domains |
@@ -55,6 +55,7 @@ removing duplicates:
 | HaGeZi DNS-over-HTTPS bypass | 3,277 |
 | NoCoin (crypto mining) | 312 |
 | URLhaus (malware being spread right now) | 118 |
+| MetaMask crypto-scam list (fake wallets, fake NFT/DeFi sites) | ~113,000 *(added Nov 2026)* |
 
 On top of these sits the UT1 base list. A blocked domain also blocks all of
 its subdomains.
@@ -76,6 +77,8 @@ one if anything looks wrong.
 - **Ads, trackers, analytics**: blocked in every app and browser.
 - **CNAME uncloaking**: catches trackers hiding behind a site's own address.
 - **Scam, phishing and malware sites**: blocked, and you're told why.
+- **Crypto scams**: fake wallet sites, fake NFT marketplaces and "connect your
+  wallet" traps, from MetaMask's own phishing list.
 - **Fake-site warning**: catches look-alikes of banks, PayPal, Netflix,
   Disney+, couriers and more (e.g. `paypa1.com`, `netflix-billing.xyz`).
   It was checked against the top 100,000 websites with no false alarms.
