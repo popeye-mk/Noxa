@@ -1,11 +1,11 @@
 {
   "format": "GBF1",
-  "built_at": "2026-11-01 13:37:21",
+  "built_at": "2026-11-01 20:09:04",
   "false_positive_target": 1e-06,
-  "sha256": "5a8b4dac7a8a417f905c102acb0f8f5ac94dcbcb10b156dd83e54798bfa644af",
+  "sha256": "af913ef340be06fa805422f49e9b0c92a130ed8270881f953e070e310f62fff1",
   "stalkerware_sha256": "6c8f65f5db907dd75155aa5d4071b0da777d41ed396ceb4178885a7ad84af2c9",
-  "threats_sha256": "2c3789e19ac65fc2d3874424d1be33584a40801e332a17b1e53e675b34bb184a",
-  "threats_domains": 527667,
+  "threats_sha256": "7cb3bb6f0e0231ec0dfc7e55396f0d64b11b2cf9635186183abbfac6378efc00",
+  "threats_domains": 528619,
   "stalkerware_domains": 525,
   "risky_tlds_sha256": "00af3c73dcfe9186f5aeb8729bbcbd1cf44be33342c5f1fe79568f8c491efa4c",
   "risky_tlds": 127,
@@ -17,16 +17,16 @@
     "k_hashes": 17
   },
   "bloom": {
-    "m_bits": 28209431,
+    "m_bits": 28261190,
     "k_hashes": 20,
-    "size_mb": 3.363,
-    "items": 981021
+    "size_mb": 3.369,
+    "items": 982821
   },
-  "unique_domains": 981021,
-  "raw_total": 1895442,
+  "unique_domains": 982821,
+  "raw_total": 1896304,
   "protection_categories": {
     "publicite": 4269,
-    "malware": 244036,
+    "malware": 243909,
     "phishing": 244063,
     "cryptojacking": 11490,
     "stalkerware": 525,
@@ -40,19 +40,19 @@
     "redirector": 109793
   },
   "extra_sources": {
-    "stevenblack": 76737,
-    "easyprivacy": 47319,
-    "easylist": 47630,
-    "oisd": 231808,
+    "stevenblack": 77759,
+    "easyprivacy": 47322,
+    "easylist": 47713,
+    "oisd": 231710,
     "hagezi_pro": 211739,
-    "adguard_dns": 185502,
+    "adguard_dns": 185589,
     "hagezi_doh": 3505,
     "dandelion_am": 11598,
     "nocoin": 312,
-    "phishing_army": 152156,
+    "phishing_army": 151919,
     "hagezi_tif_mini": 192317,
-    "urlhaus": 119,
-    "metamask": 114628
+    "urlhaus": 118,
+    "metamask": 114758
   },
   "curated_always_block": 4,
   "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); idx_i=(h1 + i*h2) mod m, i in 0..k-1"
