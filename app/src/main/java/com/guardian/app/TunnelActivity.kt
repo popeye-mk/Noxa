@@ -224,7 +224,7 @@ class TunnelActivity : Activity() {
                 runOnUiThread {
                     wgStatus.text = if (block)
                         "Tunnel ON — IP hidden; ads & trackers blocked in-tunnel " +
-                        "(via AdGuard DNS — Noxa's counter pauses in tunnel mode)."
+                        "(via HaGeZi DNS — Noxa's counter pauses in tunnel mode)."
                     else "Tunnel ON — IP hidden. (Noxa's blocking & counter pause in tunnel mode.)"
                 }
             } catch (e: Exception) {
