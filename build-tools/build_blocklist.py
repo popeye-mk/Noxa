@@ -23,6 +23,8 @@ No third-party packages required (standard library only).
 """
 
 import os, sys, json, math, struct, hashlib, time, tarfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from must_allow import MUST_ALLOW   # shared with verify_build.py
 
 # --- paths -------------------------------------------------------------------
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -540,6 +542,14 @@ def main():
     for cat in ALLOWLIST_CATEGORIES:
         allow.update(read_category(cat))
     allow.update(ALLOWLIST_DOMAINS)
+    # Nov 2026: a source naming a must-work site exactly (MetaMask: sites.google.com,
+    # then storage.googleapis.com) no longer stops the weekly update — it's kept off
+    # the list here and named in the log. verify_build.py still refuses a build that
+    # blocks one of them another way (e.g. a whole parent domain).
+    shielded = sorted(all_domains & set(MUST_ALLOW))
+    if shielded:
+        print("  kept off (named by a source, but must always work): " + ", ".join(shielded))
+    allow.update(MUST_ALLOW)
     before = len(all_domains)
     all_domains -= allow
     print("  allowlist: %d domains ; removed %d from blocklist"
