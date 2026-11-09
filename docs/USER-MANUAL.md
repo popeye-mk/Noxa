@@ -21,7 +21,7 @@ in the background through a local VPN service.
 1. Open the **Noxa** app
 2. Tap the main switch to turn it on
 3. On first launch, Android asks permission to set up a VPN connection —
-   tap **OK / Allow** (see FAQ: nothing leaves your phone)
+   tap **OK / Allow** (it's a filter on your phone, not a VPN to a server — your traffic isn't sent to Noxa)
 4. When the switch turns violet and you see **"Protected — trackers and ads
    are being blocked"**, protection is active
 
