@@ -2,7 +2,7 @@ Privacy is a right, not a privilege.
 
 Noxa blocks ads, trackers, and malware across your WHOLE phone — every app, not just the browser. One switch, that's the whole setup.
 
-How it works: Noxa runs a local filter on Android's VpnService (it is not a real VPN by default — nothing leaves your phone). Every app's DNS lookups are checked against a compiled filter of ~900,000 known ad, tracker, malware, and phishing domains. Blocked domains simply never connect.
+How it works: Noxa runs a local filter on Android's VpnService (it is not a real VPN by default — your traffic is not sent to any Noxa server). Every app's DNS lookups are checked against a compiled filter of ~990,000 known ad, tracker, malware, and phishing domains. Blocked domains simply never connect.
 
 Features:
 

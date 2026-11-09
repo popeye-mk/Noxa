@@ -2,7 +2,7 @@
 
 **Privacy is a right, not a privilege.**
 
-Noxa is a free, open, dead-simple Android app that blocks ads, trackers, and malware across your **whole phone** — every app, not just the browser — and can hide your IP through an encrypted tunnel when you're on untrusted Wi-Fi. No servers of its own, no accounts, no ads, no data sale. Provably nothing leaves your device — you can read the code and check.
+Noxa is a free, open, dead-simple Android app that blocks ads, trackers, and malware across your **whole phone** — every app, not just the browser — and can hide your IP through an encrypted tunnel when you're on untrusted Wi-Fi. No telemetry, no accounts, no ads, no Noxa servers. The only connections Noxa makes are to GitHub (list and update downloads) and to the DNS resolver you choose (or HaGeZi DNS while the tunnel is on) — plus, only if you set them up yourself, the WireGuard provider you chose and a home server you run in your own house (Noxa provides none). You can read the code and check.
 
 > Built for the people, and given back to them.
 
