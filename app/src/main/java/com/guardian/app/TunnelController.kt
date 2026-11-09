@@ -36,10 +36,13 @@ object TunnelController {
     private fun backend(ctx: Context): Backend =
         backend ?: GoBackend(ctx.applicationContext).also { backend = it }
 
-    // AdGuard DNS — blocks ads + trackers at the resolver. Used to get "blocking
-    // WHILE tunnelling" without rebuilding the WireGuard backend: we just point
-    // the tunnel's DNS here so lookups to trackers fail inside the tunnel too.
-    private const val BLOCKING_DNS = "DNS = 94.140.14.14, 94.140.15.15"
+    // HaGeZi DNS ("Full Protection", Nuremberg + Falkenstein) — blocks ads, trackers
+    // and threats at the resolver with HaGeZi Multi Pro + TIF, the strongest list
+    // inside Noxa itself; free, EU, no per-query logs. Used to get "blocking WHILE
+    // tunnelling" without rebuilding the WireGuard backend: we just point the
+    // tunnel's DNS here. v1.15.1: was AdGuard DNS, which caught 79% of the ad-block
+    // test's hosts vs 95% for HaGeZi Pro (Noxa's own filter: 97%).
+    private const val BLOCKING_DNS = "DNS = 159.69.155.94, 188.34.161.210"
 
     /** Parse the config and bring the tunnel UP. When [blockTrackers] is true we
      *  override the config's DNS with a tracker-blocking resolver (the combo:
