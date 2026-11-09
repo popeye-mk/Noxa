@@ -1,9 +1,9 @@
 # Noxa: everything it is today
 
-*Version 1.14.6 (versionCode 30) · blocklist built 27 October 2026*
+*Version 1.15.1 (versionCode 32) · blocklist built 9 November 2026*
 
 Noxa is a free, open-source (AGPL-3.0) privacy and security blocker for
-Android phones, tablets and Android TV (Android 7.0 and newer). It runs
+Android phones, tablets and Android TV (Android 7.0 to 17). It runs
 entirely on the device: no account, no servers of its own, no analytics.
 One switch turns it on; almost everything else happens by itself.
 
@@ -32,30 +32,30 @@ there is something to do.
 
 | List | Size | Used |
 |---|---|---|
-| **Main blocklist** (ads, trackers, malware, phishing, scams) | **867,189 domains** | always |
-| Dangerous-site list (to explain *why* something was blocked) | 434,350 | for warnings |
+| **Main blocklist** (ads, trackers, malware, phishing, scams) | **989,597 domains** | always |
+| Dangerous-site list (to explain *why* something was blocked) | 521,329 | for warnings |
 | Spyware (stalkerware) servers | 525 | always, with an alert |
 | Risky web endings (`.top`, `.xyz`, …) | 127 endings | only with *Strict scam protection* |
 | **Family filter** (adult, gambling, dating) | **4,672,103** | only when switched on |
 
-The main list merges 12 public lists (MetaMask's makes 13 from the next weekly build), 1,789,388 entries in total before
+The main list merges 13 public lists, 1,895,256 entries in total before
 removing duplicates:
 
 | Source | Domains |
 |---|---|
-| OISD | 234,252 |
-| HaGeZi Threat Intelligence (mini) | 212,777 |
-| HaGeZi Pro | 209,844 |
-| AdGuard DNS | 183,756 |
-| Phishing Army | 153,199 |
-| StevenBlack | 74,481 |
-| EasyList | 45,963 |
-| EasyPrivacy | 47,289 |
-| Dandelion Sprout Anti-Malware | 11,598 |
-| HaGeZi DNS-over-HTTPS bypass | 3,277 |
+| OISD | 231,817 |
+| HaGeZi Pro | 225,344 |
+| HaGeZi Threat Intelligence (mini) | 188,782 |
+| AdGuard DNS | 187,211 |
+| Phishing Army | 144,114 |
+| MetaMask crypto-scam list (fake wallets, fake NFT/DeFi sites) | 118,183 |
+| StevenBlack | 78,216 |
+| EasyPrivacy | 47,381 |
+| EasyList | 46,840 |
+| Dandelion Sprout Anti-Malware | 11,509 |
+| HaGeZi DNS-over-HTTPS bypass | 3,571 |
 | NoCoin (crypto mining) | 312 |
-| URLhaus (malware being spread right now) | 118 |
-| MetaMask crypto-scam list (fake wallets, fake NFT/DeFi sites) | ~113,000 *(added Nov 2026)* |
+| URLhaus (malware being spread right now) | 111 |
 
 On top of these sits the UT1 base list. A blocked domain also blocks all of
 its subdomains.
@@ -67,8 +67,10 @@ refuses to ship if:
 - the list shrank suspiciously, or
 - the ad-block test score went down.
 
-Before using a new list, the phone checks it again itself and keeps the old
-one if anything looks wrong.
+Must-work sites (Google, WhatsApp, GitHub, cloud storage…) are kept off the
+list even when a source names them, and a source that breaks or shrinks a lot
+opens a GitHub issue by itself. Before using a new list, the phone checks it
+again itself and keeps the old one if anything looks wrong.
 
 ---
 
@@ -151,7 +153,8 @@ one if anything looks wrong.
 - **Home-screen widget**, **Quick Settings tiles** (on/off and Check link),
   **Pause 5 minutes** from the notification.
 - **Hide my IP**: Tor through Orbot, or your own WireGuard provider
-  (Proton, Mullvad, IVPN…), with ad/tracker blocking inside the tunnel.
+  (Proton, Mullvad, IVPN…), with ad/tracker blocking inside the tunnel
+  through HaGeZi DNS (free, EU, no per-query logs).
 
 ---
 
@@ -198,7 +201,8 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
 - It filters **DNS**. An app with its own built-in encrypted DNS can slip
   past (the common ways are blocked).
 - Only one VPN can run at a time. With "Hide my IP" on, blocking happens
-  through the tunnel's DNS instead.
+  through HaGeZi DNS inside the tunnel instead: 95% in the ad-block test
+  versus 97% with Noxa's own filter.
 - Lists are lists: rarely a site is wrongly blocked (fix it with one tap) or
   missed.
 - Android lets anyone uninstall an app; the parent lock can't stop that. A
@@ -211,7 +215,7 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
 - **Code:** Kotlin, about 8,500 lines; 121 automated tests run on every
   change.
 - **Build:** Gradle 9.8, Android Gradle Plugin 9.3, Kotlin 2.3, compileSdk
-  36, targetSdk 34, minSdk 24.
+  36, targetSdk 36 (Android 16), minSdk 24.
 - **Only dependency:** the official WireGuard library (Apache-2.0).
 - **Releases:** you publish a release on GitHub, and a workflow builds and
   signs the APK. It **refuses to publish** if the APK isn't signed with the

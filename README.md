@@ -6,6 +6,8 @@ Noxa is a free, open, dead-simple Android app that blocks ads, trackers, and mal
 
 > Built for the people, and given back to them.
 
+**Current version: 1.15.1** · Android 7.0 – 17 (phones, tablets, Android TV) · blocklist rebuilt every week · see [everything Noxa does](docs/NOXA-OVERVIEW.md)
+
 ---
 
 ## Install (2 minutes)
@@ -26,22 +28,30 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 
 ## What it does
 
-- **System-wide blocking** — a local `VpnService` DNS sinkhole checks every app's lookups against a compiled **~860,000-domain** filter (UT1 + StevenBlack + EasyList/EasyPrivacy + OISD + HaGeZi + AdGuard). Blocked domains never connect.
+- **System-wide blocking** — a local `VpnService` DNS sinkhole checks every app's lookups against a compiled **~990,000-domain** filter merged from **13 public lists** plus the UT1 base ([full list below](#the-full-blocklist)). Blocked domains never connect. Ad-block test: **97%**.
 - **Per-app control + plain-language stats** — see *which company* each app is tracking you for ("Google · Advertising", "Xiaomi · Analytics"), and block any app entirely with one switch.
 - **CNAME uncloaking** — catches trackers disguised as first-party subdomains that plain domain-lists miss.
 - **IPv6-proof** — DNS is captured over IPv4 *and* IPv6, so lookups can't slip around the filter on modern networks.
 - **Works on Android TV** — appears in the TV launcher; block the trackers baked into every smart-TV app.
 - **Stays on** — battery-exemption ask, a self-restarting watchdog, and automatic start after reboot: protection that doesn't silently die.
 - **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi. **You choose the resolver**: Cloudflare, Quad9, Mullvad, AdGuard, Google or your own.
-- **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks trackers **while** tunnelling. Noxa runs no servers.
+- **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks ads and trackers **while** tunnelling through [HaGeZi DNS](https://github.com/hagezi/dns-servers) (free, EU, no per-query logs): **95%** in the ad-block test. Noxa runs no servers.
+- **Public Wi-Fi guard** — on a Wi-Fi with no password or a login page (hotel, airport, café) the tunnel switches on by itself after you log in, and off when you leave. Needs a saved tunnel config; no location permission.
 - **Watch it live** — see every app's lookups as they happen; tap one to allow or block that site on the spot. Kept in memory only, never saved.
 - **Your own lists** — *Allowed sites* (never block) and *My blocked sites* (always block), editable any time.
-- **Dangerous-site alert** — ~260,000 known scam, phishing and malware domains are flagged separately: when a browser hits one, Noxa blocks it *and* says why ("don't enter passwords there"); a non-browser app doing it gets a stronger warning.
+- **Dangerous-site alert** — ~520,000 known scam, phishing and malware domains are flagged separately: when a browser hits one, Noxa blocks it *and* says why ("don't enter passwords there"); a non-browser app doing it gets a stronger warning.
+- **Fake-site warning** — catches look-alikes of banks, PayPal, Netflix, Disney+, couriers and crypto wallets (`paypa1.com`, `netflix-billing.xyz`), checked against the top 100,000 websites for false alarms.
+- **Crypto-scam protection** — MetaMask's own phishing list (~118,000 fake wallets, fake NFT/DeFi sites and "connect your wallet" traps) is part of the weekly list.
+- **Check a link** — share or select any link → "Check link with Noxa", or copy it and tap the **Check link** tile: fake brand site, scam or spyware site, disguised link (`paypal.com@evil.xyz`), shortened link, risky ending. Offline; the link never leaves the phone.
+- **Router attack shield** — websites can't point ordinary-looking names at your router, camera or printer (DNS rebinding). Home names (`.local`, `fritz.box`, Plex) keep working.
+- **Spy-app watch** — once a day, offline: an app that can read and control your screen *and* hides from uninstalling (or didn't come from a store) is how banking trojans and stalkerware work. You only hear about it if one is found.
+- **Wi-Fi only, per app** — keep chosen apps offline on mobile data; on Wi-Fi they work normally.
+- **New-app report** — a day after you install an app, one quiet note says how many trackers it contacted and from which companies.
 - **Protection check-up** — one screen listing what keeps you protected (battery exemption, Always-on VPN, alerts, encryption, list age) with a one-tap fix for each.
 - **Spyware alert** — if any app tries to contact a known stalkerware server (~525 domains, refreshed weekly), Noxa blocks it *and* warns you, naming the app.
 - **Update notice, one tap** — a once-a-day anonymous check of this repo's Releases page. Tap the notification and Noxa downloads the new version, checks it against the SHA-256 published with the release, and opens Android's installer: you tap Install. Noxa never installs anything by itself.
 - **Home-screen widget + 7-day chart** — status, blocked-today and an on/off button on your home screen; a week of blocked trackers at a glance.
-- **Fresh lists every week** — a GitHub Action rebuilds the filter from every source each Monday and ships it only if strict safety checks pass (no false negatives, no blocked banks/connectivity/messaging apps, no suspicious size swings). Phones pick it up by themselves.
+- **Fresh lists every week** — a GitHub Action rebuilds the filter from every source each Monday and ships it only if strict safety checks pass (no false negatives, no blocked banks/connectivity/messaging apps, no suspicious size swings, the ad-block score never drops). Must-work sites (Google, WhatsApp, GitHub, cloud storage…) are kept off even when a list names them; a source that breaks or shrinks opens a GitHub issue by itself. Each phone checks the new list again before using it.
 - **Backup & restore** — save your allowed/blocked sites and app settings to a file, restore them on a new phone.
 - **Bedtime** (optional) — quiet hours per device ("21:00 to 07:00"): every app, or the ones a parent chooses, get no internet in that window. Calls and texts keep working. Shown as "Bedtime" in the live feed; changing it asks the parent PIN.
 - **Safe search** (optional) — Google, YouTube, Bing, DuckDuckGo and Yandex forced into safe / restricted mode on the device, the way family DNS services do it (a CNAME to each site's own safe-mode address). Every browser and app that uses the device's DNS; nothing is blocked outright.
@@ -57,9 +67,45 @@ Default experience is **one on/off switch**. Everything advanced lives one tap d
 
 ---
 
+## The full blocklist
+
+Built **9 November 2026** (rebuilt every Monday; numbers change a little each week). Each entry also blocks all of its subdomains.
+
+| Source | What it adds | Domains |
+|---|---|---|
+| [UT1](https://dsi.ut-capitole.fr/blacklists/) (Université Toulouse) | the base: ads, malware, phishing, crypto-mining, stalkerware, DoH bypass… | base list |
+| [OISD Big](https://oisd.nl) | ads, trackers, malware | 231,817 |
+| [HaGeZi Pro](https://github.com/hagezi/dns-blocklists) | ads, tracking, analytics, telemetry | 225,344 |
+| [HaGeZi Threat Intelligence (mini)](https://github.com/hagezi/dns-blocklists) | malware, phishing, scams, command-and-control | 188,782 |
+| [AdGuard DNS filter](https://github.com/AdguardTeam/HostlistsRegistry) | ads, trackers | 187,211 |
+| [Phishing Army (extended)](https://phishing.army) | phishing | 144,114 |
+| [MetaMask eth-phishing-detect](https://github.com/MetaMask/eth-phishing-detect) | crypto scams, fake wallets, wallet drainers | 118,183 |
+| [StevenBlack hosts](https://github.com/StevenBlack/hosts) | ads, malware | 78,216 |
+| [EasyPrivacy](https://easylist.to) | trackers | 47,381 |
+| [EasyList](https://easylist.to) | ads | 46,840 |
+| [Dandelion Sprout Anti-Malware](https://github.com/DandelionSprout/adfilt) | malware | 11,509 |
+| [HaGeZi DoH/VPN bypass](https://github.com/hagezi/dns-blocklists) | browsers' own DNS that would skip the filter | 3,571 |
+| [NoCoin](https://github.com/hoshsadiq/adblock-nocoin-list) | crypto mining in the browser | 312 |
+| [abuse.ch URLhaus](https://urlhaus.abuse.ch) | sites spreading malware *right now* (free key) | 111 |
+
+**Total: 989,597 unique domains** (1,895,256 entries before removing duplicates).
+
+Shipped next to it:
+
+| List | Size | Used |
+|---|---|---|
+| Dangerous-site list (scam / phishing / malware, for the warning) | 521,329 | always |
+| Spyware (stalkerware) servers | 525 | always, with an alert |
+| Risky web endings (`.top`, `.xyz`, …) | 127 endings | only with *Strict scam protection* |
+| Family filter (adult, gambling, dating) | 4,697,689 | only when a parent switches it on |
+
+---
+
 ## How it works
 
-Noxa is a **local filter built on Android's `VpnService`** — not a real VPN by default. It routes DNS to itself, checks each looked-up domain against a compiled **Bloom filter** (built offline; the phone never parses raw lists), and drops trackers while forwarding everything else. The optional IP tunnel embeds the official **WireGuard** library and mode-switches with the blocker (Android allows one VPN at a time).
+Noxa is a **local filter built on Android's `VpnService`** — not a real VPN by default. It routes DNS to itself, checks each looked-up domain against a compiled **Bloom filter** (built offline; the phone never parses raw lists), and drops trackers while forwarding everything else. The optional IP tunnel embeds the official **WireGuard** library (ready for 16 KB-page phones) and mode-switches with the blocker (Android allows one VPN at a time); while it's on, blocking happens at HaGeZi DNS inside the tunnel.
+
+Built for the newest Android rules (targets Android 16): screens fit between the status bar, navigation bar and keyboard, and the predictive back gesture works everywhere. Releases are signed in GitHub Actions, and the workflow refuses to publish an APK signed with any other key.
 
 ---
 
