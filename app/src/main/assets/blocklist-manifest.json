@@ -1,11 +1,11 @@
 {
   "format": "GBF1",
-  "built_at": "2026-11-02 04:23:39",
+  "built_at": "2026-11-09 09:08:01",
   "false_positive_target": 1e-06,
-  "sha256": "41401c801bf8bbdeba32c508658805afa4385e3fe247849f18089306dac59610",
+  "sha256": "da8ff8d863657e929cf0685c2158786d365dd656f0cac497a08529300351d0ea",
   "stalkerware_sha256": "6c8f65f5db907dd75155aa5d4071b0da777d41ed396ceb4178885a7ad84af2c9",
-  "threats_sha256": "4a8c1c86531bd45400e1cbb04eb21dda99a5ad9d8d30a2913665afae2607f713",
-  "threats_domains": 528597,
+  "threats_sha256": "08cc30b69245f9fbe5698f85dcfdbfd2c2964ed242e99582c62bc17ecbdf52d3",
+  "threats_domains": 521329,
   "stalkerware_domains": 525,
   "risky_tlds_sha256": "00af3c73dcfe9186f5aeb8729bbcbd1cf44be33342c5f1fe79568f8c491efa4c",
   "risky_tlds": 127,
@@ -17,17 +17,17 @@
     "k_hashes": 17
   },
   "bloom": {
-    "m_bits": 28258833,
+    "m_bits": 28456036,
     "k_hashes": 20,
-    "size_mb": 3.369,
-    "items": 982739
+    "size_mb": 3.392,
+    "items": 989597
   },
-  "unique_domains": 982739,
-  "raw_total": 1896360,
+  "unique_domains": 989597,
+  "raw_total": 1895256,
   "protection_categories": {
     "publicite": 4269,
-    "malware": 243882,
-    "phishing": 244063,
+    "malware": 239936,
+    "phishing": 239956,
     "cryptojacking": 11490,
     "stalkerware": 525,
     "marketingware": 77,
@@ -40,19 +40,19 @@
     "redirector": 109793
   },
   "extra_sources": {
-    "stevenblack": 77759,
-    "easyprivacy": 47323,
-    "easylist": 47834,
-    "oisd": 231560,
-    "hagezi_pro": 211739,
-    "adguard_dns": 185734,
-    "hagezi_doh": 3505,
-    "dandelion_am": 11598,
+    "stevenblack": 78216,
+    "easyprivacy": 47381,
+    "easylist": 46840,
+    "oisd": 231817,
+    "hagezi_pro": 225344,
+    "adguard_dns": 187211,
+    "hagezi_doh": 3571,
+    "dandelion_am": 11509,
     "nocoin": 312,
-    "phishing_army": 151592,
-    "hagezi_tif_mini": 192317,
+    "phishing_army": 144114,
+    "hagezi_tif_mini": 188782,
     "urlhaus": 111,
-    "metamask": 115058
+    "metamask": 118183
   },
   "curated_always_block": 4,
   "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); idx_i=(h1 + i*h2) mod m, i in 0..k-1"
