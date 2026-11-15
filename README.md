@@ -157,4 +157,6 @@ Noxa is an independent project, not affiliated with any other privacy/security p
 
 ## License
 
-See [`LICENSE`](LICENSE). (Copyleft — free forever, for everyone.)
+Noxa is free software under the **GNU Affero General Public License v3.0** ([`LICENSE`](LICENSE)): you can use, study, share and change it, and any changed version you share or run for others must stay free under the same licence. Copyleft — free forever, for everyone.
+
+Copyright © 2026 the Noxa authors.
