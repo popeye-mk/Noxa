@@ -7,6 +7,28 @@ This review comes from reading the code. Nothing here was tested on a device,
 so items marked **verify on device** need a quick check on a phone before
 anyone acts on them.
 
+## Status after v1.16
+
+| Item | Status |
+|---|---|
+| H1 Private DNS detection | **Done in 1.16** (check-up row, alert, home report) |
+| H2 Hard-coded DNS | **Done in 1.16 as an optional switch**, off by default until tested on more devices |
+| H3 Firmware-malware watch | **Done in 1.16** (alert, one-tap block, check-up row, home report) |
+| M1 Lockdown switch | Open: needs a check on a device |
+| M2 Botnet IP shield | Open |
+| M3 `onRevoke` | **Done in 1.16** (alert at once, immediate home report) |
+| M4 Tunnel key storage | **Done in 1.16** (Android Keystore, `FLAG_SECURE`) |
+| M5 Parent PIN | **Done in 1.16** (PBKDF2, growing lockout, clock-proof) |
+| M6 Signed blocklist manifest | Open |
+| L1 Watchdog receiver | **Done in 1.16** (split; only the boot receiver is exported) |
+| L2 Plain-DNS replies | **Partly done in 1.16** (the reply must match the question; the socket is still reused) |
+| L3 Tap-jacking | Open |
+| L4 Dependency checksums | Open |
+| L5 `SECURITY.md` | **Done in 1.16** |
+| L6 Parser fuzz test | **Done in 1.16** |
+| Device hygiene rows | **Done in 1.16** |
+| Data-smuggling detector, evidence export, larger threat feed | Open |
+
 ---
 
 ## 1. Summary

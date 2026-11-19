@@ -1,0 +1,7 @@
+1.16 — more defence, from a security review
+
+• Check-up warns when "Private DNS" sends lookups past Noxa, about old security updates, added certificates and USB debugging.
+• A built-in app that keeps reaching scam servers is named, with one tap to cut it off.
+• Optional: catch apps that use their own DNS (More settings).
+• Told at once when another VPN takes over.
+• Tunnel key encrypted; stronger parent PIN.

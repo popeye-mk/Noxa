@@ -170,6 +170,26 @@ class GuardianVpnService : VpnService() {
             return try { s.isAlwaysOn() to s.isLockdownEnabled() } catch (_: Exception) { null }
         }
 
+        // v1.16: "Catch apps that use their own DNS" (More settings; off by default).
+        const val KEY_CATCH_DNS = "catch_own_dns"
+        const val KEY_TAKEN_AWAY = "vpn_taken_away_at"
+        val PUBLIC_RESOLVERS = listOf(
+            "8.8.8.8", "8.8.4.4", "2001:4860:4860::8888", "2001:4860:4860::8844",          // Google
+            "1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001",          // Cloudflare
+            "9.9.9.9", "149.112.112.112", "2620:fe::fe", "2620:fe::9",                     // Quad9
+            "208.67.222.222", "208.67.220.220",                                            // OpenDNS
+            "94.140.14.14", "94.140.15.15",                                                // AdGuard
+            "114.114.114.114", "114.114.115.115", "223.5.5.5", "223.6.6.6",                // 114DNS, AliDNS
+            "119.29.29.29", "180.76.76.76", "77.88.8.8", "77.88.8.1")                      // DNSPod, Baidu, Yandex
+        fun catchOwnDns(ctx: Context): Boolean =
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CATCH_DNS, false)
+        fun setCatchOwnDns(ctx: Context, on: Boolean) {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CATCH_DNS, on).apply()
+        }
+        /** When Android last took the VPN away from Noxa while protection was wanted (0 = never). */
+        fun takenAwayAt(ctx: Context): Long =
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_TAKEN_AWAY, 0L)
+
         fun wantsProtection(ctx: Context): Boolean =
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WANT, false)
         fun setWantsProtection(ctx: Context, on: Boolean) {
@@ -309,6 +329,16 @@ class GuardianVpnService : VpnService() {
                 Log.w(TAG, "IPv6 DNS setup failed, continuing IPv4-only: $e")
             }
         }
+        // v1.16 (security review of 19 Nov 2026), optional: apps and firmware that ignore the phone's DNS and
+        // ask a public resolver directly (8.8.8.8, 1.1.1.1, 114.114.114.114…) were never seen. With the switch
+        // on, those addresses are routed here too: a lookup to them is filtered like any other, and their
+        // encrypted DNS (DoT/DoH by address) gets no answer, so the app falls back to the phone's DNS — us.
+        // Noxa's own lookups and "Don't filter" apps are outside the tunnel and are not affected.
+        if (catchOwnDns(this)) {
+            for (ip in PUBLIC_RESOLVERS) {
+                try { builder.addRoute(ip, if (ip.contains(':')) 128 else 32) } catch (e: Exception) { Log.w(TAG, "route $ip: $e") }
+            }
+        }
         // Don't filter Guardian's own traffic (provable zero-telemetry story).
         try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
         // User-chosen "Don't filter this app" exclusions — for apps that refuse
@@ -440,6 +470,7 @@ class GuardianVpnService : VpnService() {
                         LiveLog.add(pkg, query.domain, LiveLog.Verdict.BLOCKED, if (spy || danger) "⚠ $label" else label)
                         if (spy) Stalkerware.alert(this, pkg, query.domain)
                         if (danger) Threats.alert(this, pkg, query.domain)
+                        if (spy || danger) FirmwareWatch.record(this, pkg)   // v1.16: the device's own software?
                         DnsPacket.buildSinkholeResponse(buffer, length, query)?.let { writeTun(output, it) }
                     }
                     else -> {
@@ -638,7 +669,7 @@ class GuardianVpnService : VpnService() {
             val resp = java.net.DatagramPacket(buf, buf.size)
             try { sock.receive(resp) } catch (_: SocketTimeoutException) { return null }
             if (resp.length >= 12 && buf[0] == payload[0] && buf[1] == payload[1] &&
-                resp.address == upstream)
+                resp.address == upstream && DnsPacket.sameQuestion(payload, buf, resp.length))
                 return buf.copyOf(resp.length)
             // stale reply for an earlier query — discard and keep waiting
         }
@@ -832,6 +863,39 @@ class GuardianVpnService : VpnService() {
     }
 
     override fun onDestroy() { live = null; stopVpn(); super.onDestroy() }
+
+    /** v1.16 (security review of 19 Nov 2026): Android took the VPN away — another VPN app started, or
+     *  someone disconnected Noxa in the system's VPN settings. Before, protection just stopped and the
+     *  watchdog noticed up to 15 minutes later. Now it is said at once (unless it was Noxa's own tunnel,
+     *  a pause or the user's "off", which is checked a few seconds later, when those have settled). */
+    override fun onRevoke() {
+        val app = applicationContext
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                if (wantsProtection(app) && !isPaused(app) && !TunnelController.isUp && !isRunning.get()) {
+                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                        .putLong(KEY_TAKEN_AWAY, System.currentTimeMillis()).apply()
+                    val mgr = app.getSystemService(NotificationManager::class.java)
+                    if (Build.VERSION.SDK_INT >= 26) mgr.createNotificationChannel(
+                        NotificationChannel("guardian_alerts", "Security alerts", NotificationManager.IMPORTANCE_HIGH))
+                    val text = "Another VPN app took over, or Noxa was disconnected in the phone's VPN settings. " +
+                        "Nothing is blocked until you turn protection back on."
+                    mgr.notify(5, Notification.Builder(app, "guardian_alerts")
+                        .setContentTitle("Noxa protection was switched off")
+                        .setContentText(text).setStyle(Notification.BigTextStyle().bigText(text))
+                        .setSmallIcon(android.R.drawable.stat_sys_warning)
+                        .setContentIntent(PendingIntent.getActivity(app, 5, Intent(app, MainActivity::class.java),
+                            PendingIntent.FLAG_IMMUTABLE))
+                        .setAutoCancel(true).build())
+                    if (HomeReport.isOn(app)) Thread {              // the home server hears about it now, not in an hour
+                        try { HomeReport.send(app) } catch (_: Exception) {}
+                    }.start()
+                }
+            } catch (_: Exception) {}
+        }, 5000)
+        stopVpn()
+        super.onRevoke()
+    }
 
     // --- notification (foreground service requirement) -----------------------
     /** v1.7: the persistent notification carries today's count. Same ID +

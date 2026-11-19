@@ -50,6 +50,8 @@ class TunnelActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // v1.16: the config shows a private key — keep it out of screenshots and the recent-apps preview.
+        window.setFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE, android.view.WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(buildUi())
     }
 
@@ -101,7 +103,7 @@ class TunnelActivity : Activity() {
             gravity = Gravity.TOP
             minLines = 7
             isSingleLine = false
-            setText(getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CONFIG, ""))
+            setText(SecretBox.loadTunnelConfig(this@TunnelActivity))
         }
         root.addView(input)
         root.addView(Button(this).apply {
@@ -197,13 +199,13 @@ class TunnelActivity : Activity() {
                 return
             }
         }
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_CONFIG, text).apply()
+        SecretBox.saveTunnelConfig(this, text)
         Toast.makeText(this, if (text.isEmpty()) "Cleared" else "✓ Valid config saved on this phone",
             Toast.LENGTH_SHORT).show()
     }
 
     private fun turnTunnelOn() {
-        val cfg = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CONFIG, "").orEmpty()
+        val cfg = SecretBox.loadTunnelConfig(this)
         if (cfg.isBlank()) {
             Toast.makeText(this, "Paste & save a WireGuard config first.", Toast.LENGTH_SHORT).show()
             setSwitch(false); return
