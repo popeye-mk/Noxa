@@ -84,6 +84,32 @@ object DnsPacket {
         return Query(sb.toString().lowercase(), qtype, version, l3, udpStart, dnsStart, questionEnd)
     }
 
+    /** v1.16 (security review of 19 Nov 2026): does this plain-DNS [reply] answer exactly the question in
+     *  [query]? Both are bare DNS messages. A forged reply has to guess the name as well as the transaction
+     *  ID. Names compare without regard to case. An error reply that carries no question at all is let
+     *  through (some resolvers send those); it holds no addresses to poison anything with. */
+    fun sameQuestion(query: ByteArray, reply: ByteArray, replyLen: Int): Boolean {
+        if (query.size < 17 || replyLen < 12) return false
+        if (u16(reply, 4) == 0) return (reply[3].toInt() and 0x0F) != 0
+        var end = 12
+        while (end < query.size) {
+            val l = query[end].toInt() and 0xFF
+            if (l == 0) { end += 1; break }
+            if (l and 0xC0 != 0) return false
+            end += 1 + l
+        }
+        end += 4                                         // QTYPE + QCLASS
+        if (end > query.size || end > replyLen) return false
+        for (i in 12 until end) {
+            var a = query[i].toInt() and 0xFF
+            var b = reply[i].toInt() and 0xFF
+            if (a in 0x41..0x5A) a += 0x20
+            if (b in 0x41..0x5A) b += 0x20
+            if (a != b) return false
+        }
+        return true
+    }
+
     /** True for a TCP packet aimed at port 53 (v4 or v6). The loop drops these
      *  on purpose so the resolver falls back to UDP, which we can filter. */
     fun isTcpDns(p: ByteArray, len: Int): Boolean {

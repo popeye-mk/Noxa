@@ -124,6 +124,52 @@ class CheckupActivity : Activity() {
             }.start()
         }
 
+        // v1.16 (security review of 19 Nov 2026): things outside Noxa that switch its blocking off or weaken
+        // the device. Read on the device, no permission needed.
+        val health = DeviceHealth.read(this)
+        val bypass = DeviceHealth.bypassesNoxa(health.privateDnsHost)
+        out += Item(!bypass, "Private DNS doesn't bypass Noxa",
+            if (bypass) "Private DNS is set to ${health.privateDnsHost}: Android sends every lookup straight there, " +
+                "so Noxa blocks nothing right now. Set it to \"Off\" or \"Automatic\"."
+            else "Lookups go through Noxa.",
+            if (bypass) "Open settings" else null) {
+            Toast.makeText(this, "Open \"Private DNS\" and choose Off or Automatic.", Toast.LENGTH_LONG).show()
+            try { startActivity(Intent("android.settings.PRIVATE_DNS_SETTINGS")) }
+            catch (_: Exception) { try { startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) } catch (_: Exception) {} }
+        }
+        val patchAge = DeviceHealth.patchAgeDays(health.patch, System.currentTimeMillis())
+        if (patchAge >= 0) out += Item(!DeviceHealth.patchOld(patchAge), "Android security updates",
+            if (DeviceHealth.patchOld(patchAge)) "The last security update is from ${health.patch} — over a year old. " +
+                "Known holes stay open on this device; install a system update if one is offered."
+            else "Last security update: ${health.patch}.",
+            if (DeviceHealth.patchOld(patchAge)) "Check for update" else null) {
+            try { startActivity(Intent("android.settings.SYSTEM_UPDATE_SETTINGS")) }
+            catch (_: Exception) { try { startActivity(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)) } catch (_: Exception) {} }
+        }
+        out += Item(health.userCerts == 0, "No added certificates",
+            if (health.userCerts == 0) "Nobody can read this device's encrypted traffic with an added certificate."
+            else "${health.userCerts} certificate(s) were added on this device. With one, someone can read encrypted " +
+                "traffic. Normal for a work phone; otherwise remove what you don't recognise.",
+            if (health.userCerts == 0) null else "Show them") {
+            Toast.makeText(this, "Look under \"Trusted credentials\" → User.", Toast.LENGTH_LONG).show()
+            try { startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) } catch (_: Exception) {}
+        }
+        if (health.usbDebugging && !isTv) out += Item(false, "USB debugging is on",
+            "Anyone with a cable and this unlocked phone can control it. Turn it off unless you develop apps.",
+            "Open settings") {
+            try { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) } catch (_: Exception) {}
+        }
+        if (health.proxy) out += Item(false, "A proxy is set",
+            "This device sends its web traffic through a proxy. If you didn't set one up, remove it in the Wi-Fi settings.")
+        val firmware = FirmwareWatch.suspects(this)
+        if (firmware.isNotEmpty()) out += Item(false, "This device's own software reaches scam servers",
+            firmware.joinToString("; ") { (pkg, days) -> "${appName(pkg)} on $days days" } +
+                " (last two weeks). Noxa blocked every attempt. Software built into a device that does this is a " +
+                "warning sign — you can cut it off the internet completely.",
+            "Block it") {
+            startActivity(Intent(this, AppsActivity::class.java).putExtra(AppsActivity.EXTRA_BLOCK_PKG, firmware.first().first))
+        }
+
         // v1.14: when the device reports to a home server, say whether that still works.
         if (HomeReport.isOn(this)) {
             val age = System.currentTimeMillis() - HomeReport.lastSent(this)

@@ -115,7 +115,7 @@ object NetworkWatcher {
 
     private fun engage(ctx: Context) {
         val p = prefs(ctx)
-        val cfg = p.getString(TunnelActivity.KEY_CONFIG, "").orEmpty()
+        val cfg = SecretBox.loadTunnelConfig(ctx)
         if (!p.getBoolean(KEY_AUTO, true) || cfg.isBlank()) return     // no tunnel set up, or switched off
         if (TunnelController.isUp) return                             // already tunnelling (maybe by hand)
         if (VpnService.prepare(ctx) != null) return                   // permission needs the app

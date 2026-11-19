@@ -93,6 +93,14 @@ object HealthMonitor {
         dailyAdwareScan(ctx, now)
         weeklySummary(ctx, now)
         newAppReport(ctx, now)
+
+        // 5. v1.16: Android's "Private DNS" is set to a provider — every lookup goes straight there, past Noxa.
+        val privateDns = DeviceHealth.privateDnsHost(ctx)
+        if (DeviceHealth.bypassesNoxa(privateDns) && !TunnelController.isUp)
+            notifyOnce(ctx, "private_dns", now,
+                "Noxa isn't blocking anything right now",
+                "This phone's \"Private DNS\" setting ($privateDns) sends every lookup past Noxa. " +
+                "Tap, then set Private DNS to \"Off\" or \"Automatic\".")
         SpyAppWatch.daily(ctx, now)                 // v1.13
     }
 

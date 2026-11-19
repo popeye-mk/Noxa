@@ -11,6 +11,10 @@ All of these are **off by default** and live under *Per-app details → Settings
 | **Family filter** | Adult, gambling and dating sites blocked (UT1's adult, porn, mixed_adult, lingerie, gambling, arjel and dating categories, minus Noxa's never-block list). Several million domains, rebuilt weekly and published as a rolling GitHub release asset; downloaded only when you switch it on (about 10 MB, Wi-Fi), verified by SHA-256. Education sites (UT1's sexual_education) are deliberately left alone. Your own Allowed sites win. | More settings → Family filter |
 | **Report to my home server** | One screen in your own house for every device: see [HOME-SERVER.md](HOME-SERVER.md). | More settings → Report to my home server |
 
+Since 1.16 a home server also hears at once when the VPN is taken away from Noxa outside the app
+(`protection.taken_away_at`), and whether Android's "Private DNS" is sending lookups past it
+(`device_health.private_dns_bypass`) — the two quiet ways protection gets switched off on a child's device.
+
 ## Honest limits
 
 - **Uninstalling.** Android lets anyone uninstall an app. A parent lock can't

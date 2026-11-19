@@ -179,7 +179,13 @@ object HomeReport {
                 val protectionOn: Boolean, val alwaysOn: Boolean?, val builtAt: String, val stopsToday: Int,
                 val today: Long, val days: List<Long>, val since: Map<String, Long>,
                 val dangerApps: List<App>, val spyApps: List<App>, val sentAt: Long,
-                val filters: Filters = Filters())
+                val filters: Filters = Filters(),
+                val health: Health? = null, val takenAwayAt: Long = 0L, val firmware: List<App> = emptyList(),
+                val catchOwnDns: Boolean = false)
+
+    /** 1.16: things outside Noxa that weaken the device (see DeviceHealth). Yes/no facts and a date only. */
+    class Health(val privateDns: Boolean, val securityPatch: String, val patchAgeDays: Int,
+                 val userCertificates: Int, val usbDebugging: Boolean, val proxy: Boolean)
 
     /** The report. Pure: built from plain values, so it is unit-tested without Android. */
     fun payload(f: Facts): JSONObject = JSONObject().apply {
@@ -194,6 +200,10 @@ object HomeReport {
             put("on", f.protectionOn)
             if (f.alwaysOn != null) put("always_on", f.alwaysOn)
             put("blocklist_built", f.builtAt); put("stops_today", f.stopsToday)
+            // 1.16, only added keys: the VPN was taken away outside Noxa (unix seconds, last 24 h), and
+            // whether lookups to public resolvers are caught too
+            if (f.takenAwayAt > 0L) put("taken_away_at", f.takenAwayAt / 1000)
+            put("catches_own_dns", f.catchOwnDns)
         })
         put("blocked_today", f.today)
         put("blocked_days", JSONArray(f.days))
@@ -208,6 +218,15 @@ object HomeReport {
         })
         put("apps_30d", JSONObject().apply {
             put("dangerous_site", apps(f.dangerApps)); put("stalkerware", apps(f.spyApps))
+            // 1.16: apps that came with the device and reached scam/malware servers on 3+ days in two weeks:
+            // [name, days, false]. Malware built into a device shows up here.
+            put("firmware_suspects", apps(f.firmware))
+        })
+        if (f.health != null) put("device_health", JSONObject().apply {
+            put("private_dns_bypass", f.health.privateDns)      // true = lookups skip Noxa: nothing is blocked
+            put("security_patch", f.health.securityPatch); put("patch_age_days", f.health.patchAgeDays)
+            put("user_certificates", f.health.userCertificates)
+            put("usb_debugging", f.health.usbDebugging); put("proxy", f.health.proxy)
         })
     }
 
@@ -439,7 +458,18 @@ object HomeReport {
             filters = Filters(
                 family = ctx.getSharedPreferences(FamilyFilter.PREFS, Context.MODE_PRIVATE).getBoolean("on", false),
                 safeSearch = run { SafeSearch.load(ctx); SafeSearch.isOn },
-                parentLock = ParentLock.isOn(ctx), managed = HomeRules.managedFeatures()))
+                parentLock = ParentLock.isOn(ctx), managed = HomeRules.managedFeatures()),
+            health = try {
+                val h = DeviceHealth.read(ctx)
+                Health(DeviceHealth.bypassesNoxa(h.privateDnsHost), h.patch, DeviceHealth.patchAgeDays(h.patch, now),
+                    h.userCerts, h.usbDebugging, h.proxy)
+            } catch (_: Exception) { null },
+            takenAwayAt = GuardianVpnService.takenAwayAt(ctx).let { if (now - it in 0L..(24L * 60 * 60 * 1000)) it else 0L },
+            firmware = FirmwareWatch.suspects(ctx, now).map { (pkg, days) ->
+                App(try { ctx.packageManager.getApplicationLabel(ctx.packageManager.getApplicationInfo(pkg, 0)).toString() }
+                    catch (_: Exception) { pkg }, days.toLong(), false)
+            },
+            catchOwnDns = GuardianVpnService.catchOwnDns(ctx))
     }
 
     private fun named(ctx: Context, hits: List<Pair<String, Long>>): List<App> = hits.map { (pkg, n) ->

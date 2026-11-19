@@ -183,6 +183,10 @@
              still wants it on. Runs entirely on-device. -->
         <receiver
             android:name=".WatchdogReceiver"
+            android:exported="false" />
+        <!-- v1.16: the boot broadcast arrives here; other apps can reach nothing else. -->
+        <receiver
+            android:name=".BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

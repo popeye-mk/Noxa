@@ -40,6 +40,8 @@ class AppsActivity : Activity() {
         setContentView(buildUi())
         // v1.11: opened from "X may not be working" — go straight to its fix.
         intent?.getStringExtra(EXTRA_FIX_PKG)?.let { pkg -> showFixOptions(label(pkg), pkg) }
+        // v1.16: opened from "this device's own software keeps reaching scam servers".
+        intent?.getStringExtra(EXTRA_BLOCK_PKG)?.let { pkg -> showBlockOffer(label(pkg), pkg) }
     }
 
     override fun onResume() {
@@ -289,7 +291,8 @@ class AppsActivity : Activity() {
             "🔐  Parent lock: " + (if (ParentLock.isOn(this)) "ON" else "off"),
             "🌙  Bedtime: " + Bedtime.summary(this),
             "🔎  Safe search: " + (if (SafeSearch.isOn) "ON" else "off"),
-            "👨‍👩‍👧  Family filter: " + (if (getSharedPreferences(FamilyFilter.PREFS, MODE_PRIVATE).getBoolean("on", false)) "ON" else "off")
+            "👨‍👩‍👧  Family filter: " + (if (getSharedPreferences(FamilyFilter.PREFS, MODE_PRIVATE).getBoolean("on", false)) "ON" else "off"),
+            "🪤  Catch apps that use their own DNS: " + (if (GuardianVpnService.catchOwnDns(this)) "ON" else "off")
         )
         AlertDialog.Builder(this)
             .setTitle("More settings")
@@ -310,6 +313,7 @@ class AppsActivity : Activity() {
                     5 -> Bedtime.manage(this) { showMoreMenu() }
                     6 -> SafeSearch.manage(this) { showMoreMenu() }
                     7 -> FamilyFilter.manage(this) { showMoreMenu() }
+                    8 -> showCatchDnsDialog()
                 }
             }
             .setNegativeButton("Back") { _, _ -> showToolsMenu() }
@@ -434,6 +438,62 @@ class AppsActivity : Activity() {
                     "That's not a valid IPv4 address / https URL — nothing changed.", Toast.LENGTH_LONG).show()
             }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** v1.16: apps and firmware that ask a public DNS server directly were never seen. Optional. */
+    private fun showCatchDnsDialog() {
+        val on = GuardianVpnService.catchOwnDns(this)
+        AlertDialog.Builder(this)
+            .setTitle("Catch apps that use their own DNS")
+            .setMessage(
+                "Some apps — and the built-in software of some cheap tablets and TVs — ignore the phone's settings and " +
+                "ask a public DNS server (like 8.8.8.8 or 1.1.1.1) directly. Noxa never saw those lookups.\n\n" +
+                "With this on, lookups to ${GuardianVpnService.PUBLIC_RESOLVERS.size} well-known public DNS addresses " +
+                "go through Noxa's filter too, and encrypted DNS to those addresses gets no answer, so the app falls " +
+                "back to normal lookups.\n\n" +
+                "Honest limit: an app that tests the internet by contacting one of those addresses may say " +
+                "\"no connection\". If that happens, switch this off again.\n\n" +
+                "It is " + (if (on) "ON." else "off."))
+            .setPositiveButton(if (on) "Turn off" else "Turn on") { _, _ ->
+                val apply = {
+                    GuardianVpnService.setCatchOwnDns(this, !on)
+                    reapplyProtection(if (on) "No longer catching apps' own DNS." else "Now catching apps that use their own DNS.")
+                }
+                if (on) ParentLock.gate(this, "stop catching apps' own DNS", action = apply) else apply()
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    /** v1.16: a system app that keeps reaching scam servers — offer to cut it off completely. */
+    private fun showBlockOffer(name: String, pkg: String) {
+        val blocked = AppStats.isFirewalled(pkg)
+        AlertDialog.Builder(this)
+            .setTitle(name)
+            .setMessage(
+                "\"$name\" came with this device and keeps trying to reach known scam or malware servers. " +
+                "Noxa blocked every attempt.\n\n" +
+                (if (blocked) "It is already cut off from the internet completely.\n\n"
+                 else "You can cut it off from the internet completely: it then reaches nothing at all while Noxa is on.\n\n") +
+                "If it is something you use (a mail or chat app can show a scam link without being bad itself), " +
+                "leave it. If you don't recognise it, block it — and in its app settings, tap \"Disable\" if the " +
+                "phone allows it.\n\nSoftware built into a device can't be removed by an app. If it really is " +
+                "malware, only the maker's update or another device gets rid of it; blocking keeps it quiet.")
+            .setPositiveButton(if (blocked) "Close" else "Block it completely") { _, _ ->
+                if (!blocked) {
+                    AppStats.setFirewalled(this, pkg, true)
+                    Toast.makeText(this, "$name is cut off from the internet.", Toast.LENGTH_LONG).show()
+                    setContentView(buildUi())
+                }
+            }
+            .setNeutralButton("Its app settings") { _, _ ->
+                try {
+                    startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:$pkg")))
+                } catch (_: Exception) {}
+            }
+            .setNegativeButton("Not now", null)
             .show()
     }
 
@@ -599,6 +659,7 @@ class AppsActivity : Activity() {
 
     companion object {
         const val EXTRA_FIX_PKG = "fix_pkg"
+        const val EXTRA_BLOCK_PKG = "block_pkg"
         private const val REQ_BACKUP = 41
         private const val REQ_RESTORE = 42
     }

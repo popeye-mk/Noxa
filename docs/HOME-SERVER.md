@@ -63,6 +63,36 @@ report once an hour.
 - `filters` (v1.14.4): whether the family filter, safe search and the parent lock are on, and which of
   them the home server sets (`managed`) — so a home screen can show a child's device running without them.
 
+### Added in 1.16 (all optional — older servers can ignore them)
+
+Nothing was renamed or removed; these keys are **new** and may be absent on older Noxa versions.
+
+```json
+"protection": { "…": "…", "taken_away_at": 1794999000, "catches_own_dns": true },
+"apps_30d":   { "…": "…", "firmware_suspects": [["System Service", 4, false]] },
+"device_health": {
+  "private_dns_bypass": false,
+  "security_patch": "2023-05-01", "patch_age_days": 1297,
+  "user_certificates": 0, "usb_debugging": false, "proxy": false
+}
+```
+
+- `protection.taken_away_at` (unix seconds; only present for 24 hours after it happened): Android took
+  the VPN away from Noxa while protection was wanted — another VPN app started, or Noxa was disconnected
+  in the system's VPN settings. Noxa sends a report right away when this happens. **On a child's device
+  this is the "someone switched it off around the app" signal.**
+- `protection.catches_own_dns`: the optional "Catch apps that use their own DNS" switch is on.
+- `apps_30d.firmware_suspects`: apps that **came with the device** (system apps, not browsers) and reached
+  scam / malware / spyware servers on 3 or more different days in the last two weeks, as
+  `[name, days, false]`. Malware built into a device shows up here. Worth an alert on a home screen.
+- `device_health.private_dns_bypass`: `true` means Android's "Private DNS" is set to a provider, so every
+  lookup goes past Noxa and **nothing is blocked** even though protection is "on". Treat as urgent.
+- `device_health.security_patch` / `patch_age_days`: the device's last Android security update. Over 365
+  days is worth a warning.
+- `device_health.user_certificates`: certificates added on the device. More than 0 on a private device is
+  worth a look (they let someone read encrypted traffic).
+- `device_health.usb_debugging`, `device_health.proxy`: on / set.
+
 **Never in a report:** the sites visited or the domains blocked (Noxa doesn't
 keep them — the live feed is memory only), allowed lookups, the list of
 installed apps, or anything about who uses the device.
