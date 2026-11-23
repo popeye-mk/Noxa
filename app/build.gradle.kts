@@ -24,8 +24,8 @@ android {
         // Android 16 rules (v1.15): edge-to-edge (EdgeToEdge.kt), predictive back (no screen
         // overrides back), same-app intents unaffected by the stricter intent matching.
         targetSdk = 36
-        versionCode = 35
-        versionName = "1.16.2"
+        versionCode = 36
+        versionName = "1.16.3"
     }
 
     signingConfigs {
