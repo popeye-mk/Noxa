@@ -8,6 +8,7 @@ import android.os.Bundle
 class NoxaApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        TunnelHandover.afterProcessStart(this)      // v1.16.2: a tunnel that died with the old process
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             // Runs right after each screen's own onCreate (Android 10+; edge-to-edge is Android 15+).
             override fun onActivityPostCreated(activity: Activity, savedInstanceState: Bundle?) = EdgeToEdge.apply(activity)

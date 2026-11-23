@@ -1,0 +1,4 @@
+1.16.2 — protection always comes back after the tunnel
+
+• Switching "Hide my IP" off, a tunnel that failed to connect, or a restart while it was on left the phone with no blocking until you switched Noxa on again. Noxa's own blocking now returns by itself.
+• On a device with a parent lock, bedtime, the family filter or safe search, the public Wi-Fi guard leaves the tunnel off, so those keep working.

@@ -40,6 +40,7 @@ class MainActivity : Activity() {
                     // Protected by the tunnel — turning the master switch off stops it.
                     status.text = getString(R.string.off)
                     status.setTextColor(android.graphics.Color.parseColor("#8FA0BC"))
+                    TunnelHandover.forget(this@MainActivity)      // switched off on purpose: nothing comes back by itself
                     Thread { TunnelController.down(this@MainActivity) }.start()
                 } else {
                     stopService()

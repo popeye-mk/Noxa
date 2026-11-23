@@ -25,6 +25,7 @@ import io
 import ipaddress
 import sys
 import zipfile
+import zlib
 from urllib.parse import urlsplit
 
 # A host equal to, or under, one of these is never taken from URLhaus.
@@ -69,7 +70,7 @@ def read_text(path):
 
 
 def hosts_from_csv(text):
-    """Pure, tested: the set of online, non-shared host names in the CSV."""
+    """Pure: the set of online, non-shared host names in the CSV."""
     cols = ["id", "dateadded", "url", "url_status", "last_online", "threat",
             "tags", "urlhaus_link", "reporter"]           # abuse.ch's documented order
     out = set()
@@ -100,12 +101,12 @@ def hosts_from_csv(text):
 
 
 def hosts_from_hostfile(text):
-    """Pure, tested: host names from a hosts-format export ("127.0.0.1 name"),
+    """Pure: host names from a hosts-format export ("127.0.0.1 name"),
     minus IP addresses and shared platforms. Used for abuse.ch ThreatFox."""
     out = set()
     for line in text.splitlines():
         parts = line.split("#", 1)[0].split()
-        if len(parts) < 2:
+        if len(parts) < 2 or not is_ip(parts[0]):     # "127.0.0.1 name" only: an error page is not a list
             continue
         host = parts[1].lower().rstrip(".")
         if host in ("localhost", "localhost.localdomain") or "." not in host or is_ip(host) or shared(host):
@@ -120,15 +121,17 @@ def main(args):
     hostfile = args[:1] == ["--hostfile"]
     if hostfile:
         args = args[1:]
+    if len(args) < 2:
+        print(__doc__.strip().split("Usage:")[1].split("\n\n")[0].strip()); return 2
     *srcs, dst = args
     label = "threatfox" if hostfile else "urlhaus"
     hosts = set()
     for src in srcs:
         try:
             text = read_text(src)
-        except (OSError, StopIteration, zipfile.BadZipFile):
-            continue
-        hosts |= hosts_from_hostfile(text) if hostfile else hosts_from_csv(text)
+            hosts |= hosts_from_hostfile(text) if hostfile else hosts_from_csv(text)
+        except (OSError, StopIteration, zipfile.BadZipFile, zlib.error, csv.Error, ValueError):
+            continue                               # one broken export must not cost the other
     with open(dst, "w", encoding="utf-8") as f:
         f.write(f"# abuse.ch {label}, converted for Noxa\n")
         for h in sorted(hosts):
