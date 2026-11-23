@@ -133,7 +133,8 @@ class TunnelActivity : Activity() {
             }
         })
         root.addView(muted("Routes the tunnel's DNS through a tracker-blocking resolver, so you get " +
-            "IP-hidden AND blocking together. Turn off only if a provider's DNS misbehaves.")
+            "IP-hidden AND blocking together. Turn off only if a provider's DNS misbehaves. " +
+            "With the Family filter or Safe search on, the tunnel always uses a family resolver.")
             .apply { textSize = 12f; setPadding(0, dp(4), 0, dp(10)) })
 
         // The on/off switch for the WireGuard tunnel (the real "Hide my IP").
@@ -144,7 +145,7 @@ class TunnelActivity : Activity() {
             text = "  Hide my IP (turn tunnel on)"
             setTextColor(Color.WHITE); textSize = 16f
             isChecked = TunnelController.isUp
-            setOnCheckedChangeListener { _, on -> if (on) turnTunnelOn() else turnTunnelOff() }
+            setOnCheckedChangeListener { _, on -> if (on) askThenTurnOn() else turnTunnelOff() }
         }
         root.addView(wgSwitch)
 
@@ -204,6 +205,11 @@ class TunnelActivity : Activity() {
             Toast.LENGTH_SHORT).show()
     }
 
+    /** v1.16.1: in tunnel mode Noxa's own filter rests, and with it bedtime, per-app rules and the
+     *  gambling part of the family filter. With a parent lock set, that takes the PIN. */
+    private fun askThenTurnOn() =
+        ParentLock.gate(this, "turn on Hide my IP", onCancel = { setSwitch(false) }) { turnTunnelOn() }
+
     private fun turnTunnelOn() {
         val cfg = SecretBox.loadTunnelConfig(this)
         if (cfg.isBlank()) {
@@ -223,8 +229,12 @@ class TunnelActivity : Activity() {
         Thread {
             try {
                 TunnelController.up(this, cfg, block)
+                val family = TunnelController.familyWanted(this)
                 runOnUiThread {
-                    wgStatus.text = if (block)
+                    wgStatus.text = if (family)
+                        "Tunnel ON — IP hidden; adult sites, ads & trackers blocked in-tunnel " +
+                        "(via AdGuard Family DNS, because the Family filter or Safe search is on)."
+                    else if (block)
                         "Tunnel ON — IP hidden; ads & trackers blocked in-tunnel " +
                         "(via HaGeZi DNS — Noxa's counter pauses in tunnel mode)."
                     else "Tunnel ON — IP hidden. (Noxa's blocking & counter pause in tunnel mode.)"
@@ -252,7 +262,7 @@ class TunnelActivity : Activity() {
     private fun setSwitch(on: Boolean) {
         wgSwitch.setOnCheckedChangeListener(null)
         wgSwitch.isChecked = on
-        wgSwitch.setOnCheckedChangeListener { _, o -> if (o) turnTunnelOn() else turnTunnelOff() }
+        wgSwitch.setOnCheckedChangeListener { _, o -> if (o) askThenTurnOn() else turnTunnelOff() }
     }
 
     /** Step 7 — import a WireGuard .conf via the system file picker (no camera,

@@ -117,6 +117,7 @@ object NetworkWatcher {
         val p = prefs(ctx)
         val cfg = SecretBox.loadTunnelConfig(ctx)
         if (!p.getBoolean(KEY_AUTO, true) || cfg.isBlank()) return     // no tunnel set up, or switched off
+        if (ParentLock.isOn(ctx)) return                              // v1.16.1: a child's device keeps Noxa's full filter (bedtime, family)
         if (TunnelController.isUp) return                             // already tunnelling (maybe by hand)
         if (VpnService.prepare(ctx) != null) return                   // permission needs the app
         Thread {

@@ -2,7 +2,7 @@
 
 **Privacy is a right, not a privilege.**
 
-Noxa is a free, open, dead-simple Android app that blocks ads, trackers, and malware across your **whole phone** — every app, not just the browser — and can hide your IP through an encrypted tunnel when you're on untrusted Wi-Fi. No telemetry, no accounts, no ads, no Noxa servers. The only connections Noxa makes are to GitHub (list and update downloads) and to the DNS resolver you choose (or HaGeZi DNS while the tunnel is on) — plus, only if you set them up yourself, the WireGuard provider you chose and a home server you run in your own house (Noxa provides none). You can read the code and check.
+Noxa is a free, open, dead-simple Android app that blocks ads, trackers, and malware across your **whole phone** — every app, not just the browser — and can hide your IP through an encrypted tunnel when you're on untrusted Wi-Fi. No telemetry, no accounts, no ads, no Noxa servers. The only connections Noxa makes are to GitHub (list and update downloads) and to the DNS resolver you choose (or, while the tunnel is on, HaGeZi DNS — AdGuard Family DNS if the family filter or safe search is on) — plus, only if you set them up yourself, the WireGuard provider you chose and a home server you run in your own house (Noxa provides none). You can read the code and check.
 
 > Built for the people, and given back to them.
 
@@ -28,14 +28,14 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 
 ## What it does
 
-- **System-wide blocking** — a local `VpnService` DNS sinkhole checks every app's lookups against a compiled **~990,000-domain** filter merged from **13 public lists** plus the UT1 base ([full list below](#the-full-blocklist)). Blocked domains never connect. Ad-block test: **97%**.
+- **System-wide blocking** — a local `VpnService` DNS sinkhole checks every app's lookups against a compiled filter that blocks **~1.2 million domains**, merged from **14 public lists** plus the UT1 base ([full list below](#the-full-blocklist)). Blocked domains never connect. Ad-block test: **97%**.
 - **Per-app control + plain-language stats** — see *which company* each app is tracking you for ("Google · Advertising", "Xiaomi · Analytics"), and block any app entirely with one switch.
 - **CNAME uncloaking** — catches trackers disguised as first-party subdomains that plain domain-lists miss.
 - **IPv6-proof** — DNS is captured over IPv4 *and* IPv6, so lookups can't slip around the filter on modern networks.
 - **Works on Android TV** — appears in the TV launcher; block the trackers baked into every smart-TV app.
 - **Stays on** — battery-exemption ask, a self-restarting watchdog, and automatic start after reboot: protection that doesn't silently die.
 - **Encrypted DNS (DoH)** — hides your lookups from your ISP/Wi-Fi. **You choose the resolver**: Cloudflare, Quad9, Mullvad, AdGuard, Google or your own.
-- **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks ads and trackers **while** tunnelling through [HaGeZi DNS](https://github.com/hagezi/dns-servers) (free, EU, no per-query logs): **95%** in the ad-block test. Noxa runs no servers.
+- **Hide my IP (WireGuard tunnel)** — optional; routes through *your* provider (Proton, Mullvad, IVPN, or your own server). Blocks ads and trackers **while** tunnelling through [HaGeZi DNS](https://github.com/hagezi/dns-servers) (free, EU, no per-query logs): **95%** in the ad-block test. With the family filter or safe search on, the tunnel uses [AdGuard Family DNS](https://adguard-dns.io/en/public-dns.html) instead, so adult sites stay blocked there too. Noxa runs no servers.
 - **Public Wi-Fi guard** — on a Wi-Fi with no password or a login page (hotel, airport, café) the tunnel switches on by itself after you log in, and off when you leave. Needs a saved tunnel config; no location permission.
 - **Watch it live** — see every app's lookups as they happen; tap one to allow or block that site on the spot. Kept in memory only, never saved.
 - **Your own lists** — *Allowed sites* (never block) and *My blocked sites* (always block), editable any time.
@@ -55,7 +55,7 @@ Something not working? See [Troubleshooting](#troubleshooting) or the
 - **Backup & restore** — save your allowed/blocked sites and app settings to a file, restore them on a new phone.
 - **Bedtime** (optional) — quiet hours per device ("21:00 to 07:00"): every app, or the ones a parent chooses, get no internet in that window. Calls and texts keep working. Shown as "Bedtime" in the live feed; changing it asks the parent PIN.
 - **Safe search** (optional) — Google, YouTube, Bing, DuckDuckGo and Yandex forced into safe / restricted mode on the device, the way family DNS services do it (a CNAME to each site's own safe-mode address). Every browser and app that uses the device's DNS; nothing is blocked outright.
-- **Family filter** (optional) — adult, gambling and dating sites blocked on the device: a second list of several million domains, rebuilt weekly, downloaded only when a parent switches it on (about 10 MB), verified by SHA-256. Education sites are left alone; your Allowed sites win.
+- **Family filter** (optional) — adult, gambling and dating sites blocked on the device: a second list of about 5 million domains (UT1 plus HaGeZi NSFW, OISD NSFW and HaGeZi Gambling), rebuilt weekly, downloaded only when a parent switches it on (about 14 MB), verified by SHA-256. Education sites are left alone; your Allowed sites win.
 - **Parent lock** (optional) — a PIN on a child's phone, tablet or the TV: turning protection off, pausing it, letting an app bypass Noxa, allowing a blocked site or changing the home-server settings asks for it; the tile, widget and notification can't switch it off. Blocking more never needs the PIN. Honest limit: Android lets anyone uninstall an app — a home server notices the silence.
 - **A Linux PC in the same picture** — `pc/noxa-pc.sh` makes a Linux PC report to the same home server (updates, firewall, DNS) and switches Quad9, the firewall and automatic security updates on. See [docs/HOME-SERVER.md](docs/HOME-SERVER.md).
 - **Report to my home server** (optional, off by default) — a family with several phones, tablets and a TV gets one place in their own house that shows every device: protection on or off, blocked counts by category, and whether an app reached a scam or spyware server. Once an hour, only on your home Wi-Fi, only to a private address you typed (or found on the Wi-Fi with one tap while the home server's door is open); never the sites you visit (Noxa doesn't keep them). Format and a 30-line example server: [docs/HOME-SERVER.md](docs/HOME-SERVER.md). The report is plain JSON, so Home Assistant or any dashboard can receive it, and a server can send rules back that Noxa applies on the device. Noxa still runs no servers of its own.
@@ -69,35 +69,38 @@ Default experience is **one on/off switch**. Everything advanced lives one tap d
 
 ## The full blocklist
 
-Built **9 November 2026** (rebuilt every Monday; numbers change a little each week). Each entry also blocks all of its subdomains.
+Built **23 November 2026** (rebuilt every Monday; numbers change a little each week). Each entry also blocks all of its subdomains.
 
 | Source | What it adds | Domains |
 |---|---|---|
 | [UT1](https://dsi.ut-capitole.fr/blacklists/) (Université Toulouse) | the base: ads, malware, phishing, crypto-mining, stalkerware, DoH bypass… | base list |
-| [OISD Big](https://oisd.nl) | ads, trackers, malware | 231,817 |
-| [HaGeZi Pro](https://github.com/hagezi/dns-blocklists) | ads, tracking, analytics, telemetry | 225,344 |
-| [HaGeZi Threat Intelligence (mini)](https://github.com/hagezi/dns-blocklists) | malware, phishing, scams, command-and-control | 188,782 |
-| [AdGuard DNS filter](https://github.com/AdguardTeam/HostlistsRegistry) | ads, trackers | 187,211 |
-| [Phishing Army (extended)](https://phishing.army) | phishing | 144,114 |
-| [MetaMask eth-phishing-detect](https://github.com/MetaMask/eth-phishing-detect) | crypto scams, fake wallets, wallet drainers | 118,183 |
-| [StevenBlack hosts](https://github.com/StevenBlack/hosts) | ads, malware | 78,216 |
-| [EasyPrivacy](https://easylist.to) | trackers | 47,381 |
-| [EasyList](https://easylist.to) | ads | 46,840 |
-| [Dandelion Sprout Anti-Malware](https://github.com/DandelionSprout/adfilt) | malware | 11,509 |
-| [HaGeZi DoH/VPN bypass](https://github.com/hagezi/dns-blocklists) | browsers' own DNS that would skip the filter | 3,571 |
+| [HaGeZi Threat Intelligence (medium)](https://github.com/hagezi/dns-blocklists) | malware, phishing, scams, command-and-control | 373,012 |
+| [HaGeZi Pro](https://github.com/hagezi/dns-blocklists) | ads, tracking, analytics, telemetry | 236,199 |
+| [OISD Big](https://oisd.nl) | ads, trackers, malware | 220,866 |
+| [AdGuard DNS filter](https://github.com/AdguardTeam/HostlistsRegistry) | ads, trackers | 193,322 |
+| [Phishing Army (extended)](https://phishing.army) | phishing | 146,100 |
+| [MetaMask eth-phishing-detect](https://github.com/MetaMask/eth-phishing-detect) | crypto scams, fake wallets, wallet drainers | 120,752 |
+| [StevenBlack hosts](https://github.com/StevenBlack/hosts) | ads, malware | 76,105 |
+| [EasyList](https://easylist.to) | ads | 48,481 |
+| [EasyPrivacy](https://easylist.to) | trackers | 47,532 |
+| [abuse.ch ThreatFox](https://threatfox.abuse.ch) | servers malware phones home to (free key) | 27,842 |
+| [Dandelion Sprout Anti-Malware](https://github.com/DandelionSprout/adfilt) | malware | 11,508 |
+| [HaGeZi DoH/VPN bypass](https://github.com/hagezi/dns-blocklists) | browsers' own DNS that would skip the filter | 3,552 |
+| [abuse.ch URLhaus](https://urlhaus.abuse.ch) | sites spreading malware *right now* (free key) | 621 |
 | [NoCoin](https://github.com/hoshsadiq/adblock-nocoin-list) | crypto mining in the browser | 312 |
-| [abuse.ch URLhaus](https://urlhaus.abuse.ch) | sites spreading malware *right now* (free key) | 111 |
 
-**Total: 989,597 unique domains** (1,895,256 entries before removing duplicates).
+**Total: 1,217,671 different domains blocked** (2,121,456 entries before removing duplicates). Nothing is stored twice: 109,995 of them sit under a domain that is already listed, so the filter holds 1,107,676 entries and still blocks every one.
 
 Shipped next to it:
 
 | List | Size | Used |
 |---|---|---|
-| Dangerous-site list (scam / phishing / malware, for the warning) | 521,329 | always |
+| Dangerous-site list (scam / phishing / malware, for the warning) | 712,318 | always |
 | Spyware (stalkerware) servers | 525 | always, with an alert |
 | Risky web endings (`.top`, `.xyz`, …) | 127 endings | only with *Strict scam protection* |
-| Family filter (adult, gambling, dating) | 4,697,689 | only when a parent switches it on |
+| Family filter (adult, gambling, dating) | 5,133,088 | only when a parent switches it on |
+
+The family filter is its own download: UT1's adult, gambling and dating categories (4,697,706) plus [HaGeZi NSFW](https://github.com/hagezi/dns-blocklists), [OISD NSFW](https://oisd.nl) and [HaGeZi Gambling](https://github.com/hagezi/dns-blocklists), which add 434,103 sites UT1 misses.
 
 ---
 

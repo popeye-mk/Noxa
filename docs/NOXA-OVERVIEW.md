@@ -1,6 +1,6 @@
 # Noxa: everything it is today
 
-*Version 1.15.1 (versionCode 32) · blocklist built 9 November 2026*
+*Version 1.16.1 (versionCode 34) · blocklist built 23 November 2026*
 
 Noxa is a free, open-source (AGPL-3.0) privacy and security blocker for
 Android phones, tablets and Android TV (Android 7.0 to 17). It runs
@@ -32,30 +32,35 @@ there is something to do.
 
 | List | Size | Used |
 |---|---|---|
-| **Main blocklist** (ads, trackers, malware, phishing, scams) | **989,597 domains** | always |
-| Dangerous-site list (to explain *why* something was blocked) | 521,329 | for warnings |
+| **Main blocklist** (ads, trackers, malware, phishing, scams) | **1,217,671 domains** | always |
+| Dangerous-site list (to explain *why* something was blocked) | 712,318 | for warnings |
 | Spyware (stalkerware) servers | 525 | always, with an alert |
 | Risky web endings (`.top`, `.xyz`, …) | 127 endings | only with *Strict scam protection* |
-| **Family filter** (adult, gambling, dating) | **4,672,103** | only when switched on |
+| **Family filter** (adult, gambling, dating) | **5,133,088** | only when switched on |
 
-The main list merges 13 public lists, 1,895,256 entries in total before
-removing duplicates:
+The main list merges 14 public lists, 2,121,456 entries in total before
+removing duplicates. Nothing is stored twice: a name under an already listed
+domain is left out (109,995 of them) and stays blocked through its parent.
 
 | Source | Domains |
 |---|---|
-| OISD | 231,817 |
-| HaGeZi Pro | 225,344 |
-| HaGeZi Threat Intelligence (mini) | 188,782 |
-| AdGuard DNS | 187,211 |
-| Phishing Army | 144,114 |
-| MetaMask crypto-scam list (fake wallets, fake NFT/DeFi sites) | 118,183 |
-| StevenBlack | 78,216 |
-| EasyPrivacy | 47,381 |
-| EasyList | 46,840 |
-| Dandelion Sprout Anti-Malware | 11,509 |
-| HaGeZi DNS-over-HTTPS bypass | 3,571 |
+| HaGeZi Threat Intelligence (medium) | 373,012 |
+| HaGeZi Pro | 236,199 |
+| OISD | 220,866 |
+| AdGuard DNS | 193,322 |
+| Phishing Army | 146,100 |
+| MetaMask crypto-scam list (fake wallets, fake NFT/DeFi sites) | 120,752 |
+| StevenBlack | 76,105 |
+| EasyList | 48,481 |
+| EasyPrivacy | 47,532 |
+| abuse.ch ThreatFox (servers malware phones home to) | 27,842 |
+| Dandelion Sprout Anti-Malware | 11,508 |
+| HaGeZi DNS-over-HTTPS bypass | 3,552 |
+| abuse.ch URLhaus (malware being spread right now) | 621 |
 | NoCoin (crypto mining) | 312 |
-| URLhaus (malware being spread right now) | 111 |
+
+The family filter is UT1's adult, gambling and dating categories plus HaGeZi
+NSFW, OISD NSFW and HaGeZi Gambling (434,103 sites UT1 misses).
 
 On top of these sits the UT1 base list. A blocked domain also blocks all of
 its subdomains.
@@ -154,7 +159,8 @@ again itself and keeps the old one if anything looks wrong.
   **Pause 5 minutes** from the notification.
 - **Hide my IP**: Tor through Orbot, or your own WireGuard provider
   (Proton, Mullvad, IVPN…), with ad/tracker blocking inside the tunnel
-  through HaGeZi DNS (free, EU, no per-query logs).
+  through HaGeZi DNS (free, EU, no per-query logs), or AdGuard Family
+  DNS when the family filter or safe search is on.
 
 ---
 
@@ -165,7 +171,7 @@ again itself and keeps the old one if anything looks wrong.
 | **Parent lock** | A PIN before protection can be switched off, paused or weakened. |
 | **Bedtime** | Quiet hours: every app, or chosen apps, go offline. Calls and texts keep working. |
 | **Safe search** | Google, YouTube, Bing, DuckDuckGo and Yandex are forced into safe mode. |
-| **Family filter** | Adult, gambling and dating sites blocked (about 4.7 million domains). |
+| **Family filter** | Adult, gambling and dating sites blocked (about 5.1 million domains). Also holds with "Hide my IP" on (adult sites, through AdGuard Family DNS). |
 | **Report to my home server** | One screen at home for every device: protection on/off, counts, warnings. **Never the sites visited.** |
 
 The home server only works on your own Wi-Fi with a private address. Since
@@ -202,7 +208,10 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
   past (the common ways are blocked).
 - Only one VPN can run at a time. With "Hide my IP" on, blocking happens
   through HaGeZi DNS inside the tunnel instead: 95% in the ad-block test
-  versus 97% with Noxa's own filter.
+  versus 97% with Noxa's own filter. With the family filter or safe search
+  on, the tunnel uses AdGuard Family DNS (adult sites blocked, about 79% of
+  ads); bedtime and per-app rules rest in the tunnel, so a parent lock asks
+  for the PIN before the tunnel can be switched on.
 - Lists are lists: rarely a site is wrongly blocked (fix it with one tap) or
   missed.
 - Android lets anyone uninstall an app; the parent lock can't stop that. A
@@ -212,7 +221,7 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
 
 ## 9. Behind the scenes
 
-- **Code:** Kotlin, about 8,500 lines; 121 automated tests run on every
+- **Code:** Kotlin, about 8,500 lines; 139 automated tests run on every
   change.
 - **Build:** Gradle 9.8, Android Gradle Plugin 9.3, Kotlin 2.3, compileSdk
   36, targetSdk 36 (Android 16), minSdk 24.
