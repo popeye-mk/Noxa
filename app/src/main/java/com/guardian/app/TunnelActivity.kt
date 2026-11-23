@@ -133,9 +133,20 @@ class TunnelActivity : Activity() {
             }
         })
         root.addView(muted("Routes the tunnel's DNS through a tracker-blocking resolver, so you get " +
-            "IP-hidden AND blocking together. Turn off only if a provider's DNS misbehaves. " +
-            "With the Family filter or Safe search on, the tunnel always uses a family resolver.")
+            "IP-hidden AND blocking together. Turn off only if a provider's DNS misbehaves.")
             .apply { textSize = 12f; setPadding(0, dp(4), 0, dp(10)) })
+
+        // v1.16.3: only shown when the Family filter or Safe search is on.
+        if (TunnelController.familyOn(this)) {
+            val s = familySwitch()
+            famSwitch = s
+            root.addView(s)
+            root.addView(muted("On: the tunnel uses a family resolver (AdGuard Family DNS). Adult sites stay " +
+                "blocked and safe search stays on, but fewer ads are caught (about 80% instead of 95%). " +
+                "Off: more ads blocked (HaGeZi DNS), adult sites are NOT blocked while the tunnel is on. " +
+                "Applies the next time the tunnel is switched on.")
+                .apply { textSize = 12f; setPadding(0, dp(4), 0, dp(10)) })
+        }
 
         // The on/off switch for the WireGuard tunnel (the real "Hide my IP").
         wgStatus = muted(if (TunnelController.isUp) "Tunnel ON." else "Tunnel is off.")
@@ -206,6 +217,31 @@ class TunnelActivity : Activity() {
             Toast.LENGTH_SHORT).show()
     }
 
+    private var famSwitch: Switch? = null
+
+    private fun familySwitch(): Switch = Switch(this).apply {
+        text = "  Block adult sites in the tunnel too"
+        setTextColor(Color.WHITE); textSize = 15f
+        isChecked = TunnelController.familyInTunnel(this@TunnelActivity)
+        setPadding(0, dp(8), 0, 0)
+        setOnCheckedChangeListener { _, on -> onFamilySwitch(on) }
+    }
+
+    /** Switching it off weakens the family filter: with a parent lock that takes the PIN. */
+    private fun onFamilySwitch(on: Boolean) {
+        if (on) { TunnelController.setFamilyInTunnel(this, true); return }
+        ParentLock.gate(this, "allow adult sites in the tunnel", onCancel = { setFamilySwitch(true) }) {
+            TunnelController.setFamilyInTunnel(this, false)
+        }
+    }
+
+    private fun setFamilySwitch(on: Boolean) {
+        val s = famSwitch ?: return
+        s.setOnCheckedChangeListener(null)
+        s.isChecked = on
+        s.setOnCheckedChangeListener { _, o -> onFamilySwitch(o) }
+    }
+
     /** v1.16.1: in tunnel mode Noxa's own filter rests, and with it bedtime, per-app rules and the
      *  gambling part of the family filter. With a parent lock set, that takes the PIN. */
     private fun askThenTurnOn() =
@@ -235,7 +271,7 @@ class TunnelActivity : Activity() {
                 runOnUiThread {
                     wgStatus.text = if (family)
                         "Tunnel ON — IP hidden; adult sites, ads & trackers blocked in-tunnel " +
-                        "(via AdGuard Family DNS, because the Family filter or Safe search is on)."
+                        "(via AdGuard Family DNS: fewer ads caught, about 80%. The switch above changes that)."
                     else if (block)
                         "Tunnel ON — IP hidden; ads & trackers blocked in-tunnel " +
                         "(via HaGeZi DNS — Noxa's counter pauses in tunnel mode)."

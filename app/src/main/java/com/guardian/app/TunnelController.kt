@@ -51,9 +51,22 @@ object TunnelController {
 
     /** The Family filter or Safe search is switched on (read from the saved choice:
      *  Noxa's own filter, which normally holds it, is stopped in tunnel mode). */
-    fun familyWanted(ctx: Context): Boolean =
+    fun familyOn(ctx: Context): Boolean =
         ctx.getSharedPreferences(FamilyFilter.PREFS, Context.MODE_PRIVATE).getBoolean("on", false) ||
             ctx.getSharedPreferences(SafeSearch.PREFS, Context.MODE_PRIVATE).getBoolean("on", false)
+
+    /** v1.16.3: "Block adult sites in the tunnel too" (the tunnel screen; default on). The family resolver
+     *  catches about 80% of the ad-block test, HaGeZi DNS about 95% - no free resolver does both, so the
+     *  owner of the phone decides. Behind the parent PIN when there is one. */
+    private const val KEY_FAMILY_IN_TUNNEL = "family_in_tunnel"
+    fun familyInTunnel(ctx: Context): Boolean =
+        ctx.getSharedPreferences(TunnelActivity.PREFS, Context.MODE_PRIVATE).getBoolean(KEY_FAMILY_IN_TUNNEL, true)
+    fun setFamilyInTunnel(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(TunnelActivity.PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_FAMILY_IN_TUNNEL, on).apply()
+    }
+
+    /** Does the tunnel use the family resolver? */
+    fun familyWanted(ctx: Context): Boolean = TunnelDns.familyResolver(familyOn(ctx), familyInTunnel(ctx))
 
     /** Bring the tunnel DOWN. Safe to call even if it was never up. */
     fun down(ctx: Context) {
@@ -85,6 +98,9 @@ object TunnelDns {
     // by itself) was a way straight past it. Fewer ads caught
     // (about 79% vs 95%), but on a child's device the family filter comes first.
     const val FAMILY = "DNS = 94.140.14.15, 94.140.15.16"
+
+    /** The family resolver is used when a family feature is on AND the owner kept "adult sites in the tunnel" blocked. */
+    fun familyResolver(familyFeatureOn: Boolean, keepInTunnel: Boolean): Boolean = familyFeatureOn && keepInTunnel
 
     /** The DNS line to force into the config; null = keep the config's own DNS. */
     fun choose(blockTrackers: Boolean, familyOn: Boolean): String? = when {

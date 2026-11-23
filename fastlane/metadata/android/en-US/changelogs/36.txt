@@ -1,5 +1,6 @@
-1.16.3 — fixes after checking yesterday's bigger lists
+1.16.3 — fixes after checking the bigger lists
 
-• The public Wi-Fi guard works again with the family filter on (1.16.2 stopped it). It now only rests with a parent lock or bedtime.
-• Well-known services a new malware feed blocked by mistake work again (Python packages, picture and file hosts, GoDaddy-built shops).
-• A tracker is no longer called a "scam site": tapping a Google ad or a site using Lucky Orange no longer raises the dangerous-site warning.
+• The public Wi-Fi guard works again with the family filter on; it only rests with a parent lock or bedtime.
+• Tunnel + family filter: a new switch chooses between blocking adult sites (about 80% of ads) and more ad blocking (95%).
+• Services a new malware feed blocked by mistake work again (Python packages, picture and file hosts).
+• Trackers are no longer called "scam sites" (Google ads, Lucky Orange).

@@ -20,6 +20,13 @@ class V1162Test {
         assertTrue(TunnelHandover.guardStaysOff(parentLock = false, bedtime = true))
     }
 
+    @Test fun theOwnerChoosesTheTunnelResolver() {                                   // v1.16.3
+        assertTrue(TunnelDns.familyResolver(familyFeatureOn = true, keepInTunnel = true))     // the default
+        assertFalse(TunnelDns.familyResolver(familyFeatureOn = true, keepInTunnel = false))   // "more ads blocked" chosen
+        assertFalse(TunnelDns.familyResolver(familyFeatureOn = false, keepInTunnel = true))   // no family feature: as before 1.16.1
+        assertEquals(TunnelDns.BLOCKING, TunnelDns.choose(blockTrackers = true, familyOn = TunnelDns.familyResolver(true, false)))
+    }
+
     @Test fun interfaceHeaderWithACommentStillGetsTheDns() {
         val cfg = "[Interface] # my phone\nPrivateKey = abc\nDNS = 10.2.0.1\n\n[Peer] # server\nPublicKey = def"
         val out = TunnelDns.withDns(cfg, TunnelDns.FAMILY)

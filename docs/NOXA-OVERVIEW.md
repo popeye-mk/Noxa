@@ -210,8 +210,9 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
 - Only one VPN can run at a time. With "Hide my IP" on, blocking happens
   through HaGeZi DNS inside the tunnel instead: 95% in the ad-block test
   versus 97% with Noxa's own filter. With the family filter or safe search
-  on, the tunnel uses AdGuard Family DNS (adult sites blocked, about 79% of
-  ads); bedtime and per-app rules rest in the tunnel, so a parent lock asks
+  on, the tunnel uses AdGuard Family DNS (adult sites blocked, about 80% of
+  ads; a switch on the tunnel screen lets the owner choose more ad blocking
+  instead); bedtime and per-app rules rest in the tunnel, so a parent lock asks
   for the PIN before the tunnel can be switched on. When the tunnel ends
   (switched off, failed to connect, phone restarted), Noxa's own filter
   comes back by itself.
@@ -224,7 +225,7 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
 
 ## 9. Behind the scenes
 
-- **Code:** Kotlin, about 8,500 lines; 140 automated tests run on every
+- **Code:** Kotlin, about 8,500 lines; 141 automated tests run on every
   change.
 - **Build:** Gradle 9.8, Android Gradle Plugin 9.3, Kotlin 2.3, compileSdk
   36, targetSdk 36 (Android 16), minSdk 24.
