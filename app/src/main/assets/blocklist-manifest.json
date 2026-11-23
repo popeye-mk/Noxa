@@ -1,11 +1,11 @@
 {
   "format": "GBF1",
-  "built_at": "2026-11-23 20:47:22",
+  "built_at": "2026-11-23 22:22:30",
   "false_positive_target": 1e-06,
-  "sha256": "0ddea4dcd9ed33eec75059adaca8db03fc7d5970cf3a6ac462a7330b9db0ad7d",
+  "sha256": "0b739023e91d83dfa6d7341681435abef1ad3f2ae4072db293713c05d1e9df7c",
   "stalkerware_sha256": "6c8f65f5db907dd75155aa5d4071b0da777d41ed396ceb4178885a7ad84af2c9",
-  "threats_sha256": "93cecd83869a79a8c5fdbaec31640f663de2e99bb2b41a8cf9ce900b5eaa1af7",
-  "threats_domains": 712377,
+  "threats_sha256": "749a392fc6e0bb866a027020ce37796986ea3801c12d01e20cd01c44c81da06f",
+  "threats_domains": 712407,
   "stalkerware_domains": 525,
   "risky_tlds_sha256": "00af3c73dcfe9186f5aeb8729bbcbd1cf44be33342c5f1fe79568f8c491efa4c",
   "risky_tlds": 127,
@@ -17,20 +17,20 @@
     "k_hashes": 17
   },
   "bloom": {
-    "m_bits": 31851734,
+    "m_bits": 31853891,
     "k_hashes": 20,
     "size_mb": 3.797,
-    "items": 1107687
+    "items": 1107762
   },
-  "unique_domains": 1107687,
-  "listed_domains": 1217756,
-  "threats_listed": 743202,
+  "unique_domains": 1107762,
+  "listed_domains": 1217848,
+  "threats_listed": 743247,
   "family_listed": 5133088,
   "family_also_in_main": 335421,
-  "raw_total": 2121561,
+  "raw_total": 2121483,
   "protection_categories": {
     "publicite": 4270,
-    "malware": 241703,
+    "malware": 241537,
     "phishing": 241574,
     "cryptojacking": 11489,
     "stalkerware": 525,
@@ -46,18 +46,18 @@
   "extra_sources": {
     "stevenblack": 76105,
     "easyprivacy": 47532,
-    "easylist": 48482,
-    "oisd": 220866,
+    "easylist": 48510,
+    "oisd": 220892,
     "hagezi_pro": 236199,
-    "adguard_dns": 193322,
+    "adguard_dns": 193351,
     "hagezi_doh": 3552,
     "dandelion_am": 11508,
     "nocoin": 312,
     "phishing_army": 146203,
     "hagezi_tif": 373012,
-    "urlhaus": 621,
-    "threatfox": 27842,
-    "metamask": 120753
+    "urlhaus": 622,
+    "threatfox": 27838,
+    "metamask": 120761
   },
   "family_sources": {
     "hagezi_nsfw": 81546,
