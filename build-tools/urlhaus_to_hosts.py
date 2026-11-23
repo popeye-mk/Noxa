@@ -38,6 +38,12 @@ SHARED_PLATFORMS = (
     "pastebin.com", "telegram.org", "t.me", "archive.org", "yandex.ru",
     "disk.yandex.ru", "box.com", "catbox.moe", "transfer.sh", "4shared.com",
     "apple.com", "icloud.com", "facebook.com", "fbcdn.net", "whatsapp.net",
+    # Nov 2026 (ThreatFox): everyday services malware merely USES - a profile
+    # page as a hidden address book, or a "what is my IP" lookup.
+    "steamcommunity.com", "x.com", "twitter.com", "instagram.com", "youtube.com",
+    "tiktok.com", "reddit.com", "notion.so", "trello.com", "ipify.org",
+    "ip-api.com", "ipinfo.io", "icanhazip.com", "ifconfig.me", "dyndns.org",
+    "myexternalip.com", "cloudflare.com", "quad9.net",
 )
 
 

@@ -149,7 +149,7 @@ ALLOWLIST_DOMAINS = [
 # filter (so it's blocked either way); the app uses this one only to tell the
 # user WHY — "that link is a known scam site" — instead of a silent failure.
 THREAT_CATEGORIES = ["phishing", "malware", "cryptojacking", "ddos", "hacking", "dialer"]
-THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif_mini", "urlhaus", "threatfox", "metamask"]
+THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif", "urlhaus", "threatfox", "metamask"]
 
 # v1.14.5: a well-known service's own domains are never "a scam site". A child's tablet reported Disney+
 # reaching "a known scam or malware server" (20 Oct 2026): one of its servers sat on a threat list. These stay
@@ -274,7 +274,10 @@ EXTRA_SOURCES = {
     "nocoin":         ("blocklists/nocoin/hosts.txt",         "hosts"),    # cryptomining
     "phishing_army":  ("blocklists/phishing/phishing_army.txt","domains"), # phishing
     # v1.10 stronger malware protection (also feed the dangerous-site alert):
-    "hagezi_tif_mini": ("blocklists/hagezi/tif_mini.txt",     "adblock"),  # threat intel
+    # Nov 2026: "medium" instead of "mini" — 373k names instead of 189k; 176k of
+    # them (malware, phishing, scam, botnet control) were not blocked before.
+    # The full feed (1M+) would double the whole list for little extra.
+    "hagezi_tif":     ("blocklists/hagezi/tif_medium.txt",    "adblock"),  # threat intel
     "urlhaus":        ("blocklists/urlhaus/hostfile.txt",     "hosts"),    # malware hosts
     # Nov 2026: abuse.ch ThreatFox — names malware phones home to (botnet control,
     # payload delivery). Same key as URLhaus; shared platforms filtered out.
