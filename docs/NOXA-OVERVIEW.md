@@ -1,6 +1,6 @@
 # Noxa: everything it is today
 
-*Version 1.16.2 (versionCode 35) · blocklist built 23 November 2026*
+*Version 1.16.3 (versionCode 36) · blocklist built 23 November 2026*
 
 Noxa is a free, open-source (AGPL-3.0) privacy and security blocker for
 Android phones, tablets and Android TV (Android 7.0 to 17). It runs
@@ -125,7 +125,7 @@ again itself and keeps the old one if anything looks wrong.
 - **Public Wi-Fi guard**: on Wi-Fi with no password or with a login page,
   your "Hide my IP" tunnel switches on after login and off when you leave.
   It needs a saved tunnel config, and stays off on a device with a parent
-  lock, bedtime, the family filter or safe search.
+  lock or bedtime.
 - **Update notice**: once a day it checks for a newer Noxa. Updating takes one
   tap, and the download must be Noxa, newer than your copy, and signed with
   the Noxa release key.
@@ -224,7 +224,7 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
 
 ## 9. Behind the scenes
 
-- **Code:** Kotlin, about 8,500 lines; 139 automated tests run on every
+- **Code:** Kotlin, about 8,500 lines; 140 automated tests run on every
   change.
 - **Build:** Gradle 9.8, Android Gradle Plugin 9.3, Kotlin 2.3, compileSdk
   36, targetSdk 36 (Android 16), minSdk 24.

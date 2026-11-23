@@ -31,6 +31,12 @@ object TunnelHandover {
     fun familyDevice(ctx: Context): Boolean =
         ParentLock.isOn(ctx) || Bedtime.isOn(ctx) || TunnelController.familyWanted(ctx)
 
+    /** v1.16.3: when the public Wi-Fi guard must leave the tunnel off. Only what the tunnel would switch
+     *  off for a child: bedtime, and anything behind a parent PIN. The family filter and safe search alone
+     *  don't count - the tunnel keeps both through the family resolver, and 1.16.2 wrongly stopped the guard
+     *  on an adult's own phone that simply has the family filter on. Pure, unit-tested. */
+    fun guardStaysOff(parentLock: Boolean, bedtime: Boolean): Boolean = parentLock || bedtime
+
     /** Call BEFORE stopping the filter to make room for the tunnel. */
     fun remember(ctx: Context) {
         val p = prefs(ctx)

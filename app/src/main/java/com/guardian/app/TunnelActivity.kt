@@ -163,7 +163,7 @@ class TunnelActivity : Activity() {
             "café), Noxa turns this tunnel on after you've logged in, and back off when you leave — " +
             "then normal blocking resumes. Needs a saved config above. Noxa can't see Wi-Fi names " +
             "(that would need your location), only whether the Wi-Fi is open. Stays off while a " +
-            "parent lock, bedtime, the family filter or safe search is on: those need Noxa's own filter.")
+            "parent lock or bedtime is on: those need Noxa's own filter.")
             .apply { textSize = 12f; setPadding(0, dp(4), 0, dp(10)) })
 
         return ScrollView(this).apply { addView(root) }

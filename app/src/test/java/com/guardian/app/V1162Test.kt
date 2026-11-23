@@ -14,6 +14,12 @@ class V1162Test {
         assertTrue(TunnelHandover.bringBack(filterWasOn = true, familyDevice = true))
     }
 
+    @Test fun wifiGuardOnlyRestsOnAChildsDevice() {                                   // v1.16.3
+        assertFalse(TunnelHandover.guardStaysOff(parentLock = false, bedtime = false))    // family filter alone: the guard works
+        assertTrue(TunnelHandover.guardStaysOff(parentLock = true, bedtime = false))
+        assertTrue(TunnelHandover.guardStaysOff(parentLock = false, bedtime = true))
+    }
+
     @Test fun interfaceHeaderWithACommentStillGetsTheDns() {
         val cfg = "[Interface] # my phone\nPrivateKey = abc\nDNS = 10.2.0.1\n\n[Peer] # server\nPublicKey = def"
         val out = TunnelDns.withDns(cfg, TunnelDns.FAMILY)
