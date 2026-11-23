@@ -1,0 +1,6 @@
+1.16.1 — the family filter can't be bypassed with the tunnel
+
+• With "Hide my IP" on, the Family filter and Safe search were not applied. The tunnel now uses a family resolver (AdGuard Family DNS) when either is on.
+• With a parent lock, switching the tunnel on asks for the PIN.
+• Family filter: about 430,000 more adult and gambling sites.
+• Main list: about 200,000 more malware, phishing and scam sites; nothing stored twice.
