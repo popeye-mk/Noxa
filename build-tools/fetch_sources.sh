@@ -60,20 +60,37 @@ get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/tif.mi
 # Since Oct 2026 the keyless hostfile is gone (410); the feed is a CSV export
 # behind a free abuse.ch Auth-Key (repo secret ABUSECH_AUTH_KEY). The key sits
 # in the URL, so the URL is NEVER printed. No key = skipped, build goes on.
+# Nov 2026: two exports are merged — online.csv (every URL serving malware now,
+# however old) and recent.csv (last 30 days) — so one failing still leaves a list.
+# ThreatFox (same key): names malware phones home to (botnet control, payload
+# delivery), as a ready-made hosts file.
+abusech() {   # abusech <host> <file> <dest>   quiet on purpose: the URL holds the key
+  curl -fsSL --retry 3 --retry-delay 5 --max-time 300 -A "Noxa-blocklist-builder" \
+       -o "$3" "https://$1/v2/files/exports/${ABUSECH_AUTH_KEY}/$2" 2>/dev/null && [ -s "$3" ]
+}
 if [ -n "${ABUSECH_AUTH_KEY:-}" ]; then
-  mkdir -p "$BL/urlhaus"
-  if curl -fsSL --retry 3 --retry-delay 5 --max-time 300 -A "Noxa-blocklist-builder" \
-       -o "$BL/urlhaus/recent.csv.part" \
-       "https://urlhaus-api.abuse.ch/v2/files/exports/${ABUSECH_AUTH_KEY}/recent.csv" 2>/dev/null \
-     && python3 "$ROOT/build-tools/urlhaus_to_hosts.py" "$BL/urlhaus/recent.csv.part" "$BL/urlhaus/hostfile.txt"; then
+  mkdir -p "$BL/urlhaus" "$BL/threatfox"
+  abusech urlhaus-api.abuse.ch online.csv "$BL/urlhaus/online.csv.part" || echo "  note  urlhaus online.csv not delivered"
+  abusech urlhaus-api.abuse.ch recent.csv "$BL/urlhaus/recent.csv.part" || echo "  note  urlhaus recent.csv not delivered"
+  if python3 "$ROOT/build-tools/urlhaus_to_hosts.py" "$BL/urlhaus/online.csv.part" "$BL/urlhaus/recent.csv.part" "$BL/urlhaus/hostfile.txt"; then
     printf '  ok    %-40s %8s lines\n' "urlhaus/hostfile.txt" "$(wc -l < "$BL/urlhaus/hostfile.txt")"
   else
     printf '  FAIL  urlhaus/hostfile.txt  (abuse.ch export; check the ABUSECH_AUTH_KEY secret)\n'
+    rm -f "$BL/urlhaus/hostfile.txt"
     failed+=("urlhaus/hostfile.txt")
   fi
-  rm -f "$BL/urlhaus/recent.csv.part"
+  rm -f "$BL/urlhaus/online.csv.part" "$BL/urlhaus/recent.csv.part"
+  if abusech threatfox-api.abuse.ch hostfile.txt "$BL/threatfox/raw.part" \
+     && python3 "$ROOT/build-tools/urlhaus_to_hosts.py" --hostfile "$BL/threatfox/raw.part" "$BL/threatfox/hostfile.txt"; then
+    printf '  ok    %-40s %8s lines\n' "threatfox/hostfile.txt" "$(wc -l < "$BL/threatfox/hostfile.txt")"
+  else
+    printf '  FAIL  threatfox/hostfile.txt  (abuse.ch ThreatFox export)\n'
+    rm -f "$BL/threatfox/hostfile.txt"
+    failed+=("threatfox/hostfile.txt")
+  fi
+  rm -f "$BL/threatfox/raw.part"
 else
-  echo "  skip  urlhaus/hostfile.txt  (no ABUSECH_AUTH_KEY secret; see docs/FDROID-AND-RELEASE.md)"
+  echo "  skip  urlhaus + threatfox  (no ABUSECH_AUTH_KEY secret; see docs/FDROID-AND-RELEASE.md)"
 fi
 # MetaMask eth-phishing-detect: crypto-scam and wallet-phishing domains (JSON).
 get "https://raw.githubusercontent.com/MetaMask/eth-phishing-detect/main/src/config.json"     "metamask/config.json"
@@ -81,6 +98,13 @@ get "https://raw.githubusercontent.com/MetaMask/eth-phishing-detect/main/src/con
 # use most. NOT added to the main filter — it powers the optional
 # "Strict scam protection" switch in the app (off by default).
 get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/spam-tlds-adblock.txt" "hagezi/spam_tlds.txt"
+
+# Family filter only (never the main list): the adult and gambling lists that
+# fill what UT1 misses. See FAMILY_EXTRA_SOURCES in build_blocklist.py.
+echo "==> Family filter sources (best-effort)"
+get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt"            "hagezi/nsfw.txt"
+get "https://nsfw.oisd.nl/"                                                                 "oisd/oisd_nsfw.txt"
+get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/gambling.medium.txt" "hagezi/gambling_medium.txt"
 
 if [ ${#failed[@]} -gt 0 ]; then
   echo "WARNING: ${#failed[@]} optional source(s) failed: ${failed[*]}"

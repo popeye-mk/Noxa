@@ -79,20 +79,24 @@ If the job fails with "Signing secrets missing", do the one-time setup.
    `fastlane/.../changelogs/<versionCode>.txt` must exist on `main`
    before the release is created.
 
-## Optional: URLhaus malware feed (free abuse.ch key)
+## Optional: abuse.ch malware feeds (free key)
 
-Since October 2026 abuse.ch serves the URLhaus feed only with a free
-Auth-Key (the old keyless hostfile answers "410 Gone"). Without the key the
-weekly rebuild simply skips URLhaus; with it, the hosts currently serving
-malware are added again.
+Since October 2026 abuse.ch serves its feeds only with a free Auth-Key (the
+old keyless hostfile answers "410 Gone"). Without the key the weekly rebuild
+simply skips them; with it, two feeds are added:
+
+- **URLhaus**: hosts serving malware right now (the "online" export and the
+  last-30-days export, merged).
+- **ThreatFox**: names malware phones home to (botnet control, payload
+  delivery).
 
 1. Sign up at https://auth.abuse.ch (free) and copy your **Auth-Key**.
 2. Repo → Settings → Secrets and variables → Actions → New repository
    secret: name `ABUSECH_AUTH_KEY`, value = the key.
 
 The key is only used by the weekly rebuild on GitHub (never in the app) and
-is never printed: `build-tools/urlhaus_to_hosts.py` turns the export into a
-hosts file, keeping only online malware hosts and never shared platforms
+is never printed: `build-tools/urlhaus_to_hosts.py` turns the exports into
+hosts files, keeping only online malware hosts and never shared platforms
 (GitHub, Google Drive, Dropbox, Discord...).
 
 ## When a list source breaks

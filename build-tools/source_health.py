@@ -38,8 +38,9 @@ def problems(new_counts, old_counts):
 
 def main(new_path, old_path, report_path):
     try:
-        new = json.load(open(new_path)).get("extra_sources", {})
-        old = json.load(open(old_path)).get("extra_sources", {})
+        new_m, old_m = json.load(open(new_path)), json.load(open(old_path))
+        new = {**new_m.get("extra_sources", {}), **new_m.get("family_sources", {})}
+        old = {**old_m.get("extra_sources", {}), **old_m.get("family_sources", {})}
     except (OSError, ValueError) as e:
         new, old = {}, {}
         print(f"source health: could not read manifests ({e})")

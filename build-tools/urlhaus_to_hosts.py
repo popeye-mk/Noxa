@@ -13,7 +13,12 @@ Rules (the old hostfile behaved the same way):
   bad (github.com, Google Drive, Dropbox, Discord CDN, cloud storage...):
   blocking those would break the normal internet for everyone
 
-Usage: urlhaus_to_hosts.py <recent.csv or .zip> <out hosts file>
+Usage: urlhaus_to_hosts.py <export.csv or .zip> [<more.csv> ...] <out hosts file>
+       urlhaus_to_hosts.py --hostfile <threatfox hostfile.txt> <out hosts file>
+
+Nov 2026: reads online.csv (everything online now) AND recent.csv (last 30
+days) and merges them, and with --hostfile filters abuse.ch ThreatFox's
+ready-made hosts file through the same shared-platform rule.
 """
 import csv
 import io
@@ -88,15 +93,43 @@ def hosts_from_csv(text):
     return out
 
 
-def main(src, dst):
-    hosts = hosts_from_csv(read_text(src))
+def hosts_from_hostfile(text):
+    """Pure, tested: host names from a hosts-format export ("127.0.0.1 name"),
+    minus IP addresses and shared platforms. Used for abuse.ch ThreatFox."""
+    out = set()
+    for line in text.splitlines():
+        parts = line.split("#", 1)[0].split()
+        if len(parts) < 2:
+            continue
+        host = parts[1].lower().rstrip(".")
+        if host in ("localhost", "localhost.localdomain") or "." not in host or is_ip(host) or shared(host):
+            continue
+        out.add(host)
+    return out
+
+
+def main(args):
+    """urlhaus_to_hosts.py [--hostfile] <in> [<in> ...] <out>
+    Several inputs are merged; one that is missing or empty is skipped."""
+    hostfile = args[:1] == ["--hostfile"]
+    if hostfile:
+        args = args[1:]
+    *srcs, dst = args
+    label = "threatfox" if hostfile else "urlhaus"
+    hosts = set()
+    for src in srcs:
+        try:
+            text = read_text(src)
+        except (OSError, StopIteration, zipfile.BadZipFile):
+            continue
+        hosts |= hosts_from_hostfile(text) if hostfile else hosts_from_csv(text)
     with open(dst, "w", encoding="utf-8") as f:
-        f.write("# abuse.ch URLhaus (online malware hosts), converted for Noxa\n")
+        f.write(f"# abuse.ch {label}, converted for Noxa\n")
         for h in sorted(hosts):
             f.write(f"0.0.0.0 {h}\n")
-    print(f"  urlhaus: {len(hosts)} online malware hosts")
+    print(f"  {label}: {len(hosts)} " + ("malware control / delivery names" if hostfile else "online malware hosts"))
     return 0 if hosts else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1], sys.argv[2]))
+    sys.exit(main(sys.argv[1:]))

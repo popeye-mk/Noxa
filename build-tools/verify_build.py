@@ -24,7 +24,7 @@ SHIPPED = os.path.join(os.path.dirname(HERE), "app", "src", "main", "assets", "b
 MAX_DROP = 0.15      # refuse if the new list has >15% fewer domains
 MAX_GROWTH = 1.60    # refuse if it's >60% bigger
 
-from must_allow import MUST_ALLOW   # shared with build_blocklist.py
+from must_allow import MUST_ALLOW, FAMILY_MUST_ALLOW   # shared with build_blocklist.py
 MUST_BLOCK = [
     "doubleclick.net", "googlesyndication.com", "google-analytics.com",
     "app-measurement.com", "adnxs.com", "scorecardresearch.com",
@@ -147,11 +147,6 @@ check("threats: false-positive rate <= 2e-5 (300k names)", t_fp <= 6, f"{t_fp}/3
 check("threats: everyday sites not flagged", not any(t_contains(d) for d in MUST_ALLOW))
 
 # v1.14 family filter (optional download): same strictness, its own file.
-FAMILY_MUST_ALLOW = MUST_ALLOW + [
-    "wikipedia.org", "nl.wikipedia.org", "youtube.com", "www.youtube.com", "netflix.com", "disneyplus.com",
-    "ketnet.be", "vrt.be", "vrtmax.be", "nickelodeon.com", "duolingo.com", "khanacademy.org", "scratch.mit.edu",
-    "smartschool.be", "bingel.be", "kidsweek.nl", "bbc.co.uk", "nasa.gov", "klascement.net",
-]
 f_path = os.path.join(OUT, "family.gbf")
 f_raw = open(f_path, "rb").read()
 f_k = struct.unpack("<I", f_raw[4:8])[0] if len(f_raw) >= 24 else 0      # same header as the main filter

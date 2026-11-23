@@ -24,7 +24,7 @@ No third-party packages required (standard library only).
 
 import os, sys, json, math, struct, hashlib, time, tarfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from must_allow import MUST_ALLOW   # shared with verify_build.py
+from must_allow import MUST_ALLOW, FAMILY_MUST_ALLOW   # shared with verify_build.py
 
 # --- paths -------------------------------------------------------------------
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -149,7 +149,7 @@ ALLOWLIST_DOMAINS = [
 # filter (so it's blocked either way); the app uses this one only to tell the
 # user WHY — "that link is a known scam site" — instead of a silent failure.
 THREAT_CATEGORIES = ["phishing", "malware", "cryptojacking", "ddos", "hacking", "dialer"]
-THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif_mini", "urlhaus", "metamask"]
+THREAT_EXTRA_SOURCES = ["phishing_army", "dandelion_am", "nocoin", "hagezi_tif_mini", "urlhaus", "threatfox", "metamask"]
 
 # v1.14.5: a well-known service's own domains are never "a scam site". A child's tablet reported Disney+
 # reaching "a known scam or malware server" (20 Oct 2026): one of its servers sat on a threat list. These stay
@@ -276,6 +276,9 @@ EXTRA_SOURCES = {
     # v1.10 stronger malware protection (also feed the dangerous-site alert):
     "hagezi_tif_mini": ("blocklists/hagezi/tif_mini.txt",     "adblock"),  # threat intel
     "urlhaus":        ("blocklists/urlhaus/hostfile.txt",     "hosts"),    # malware hosts
+    # Nov 2026: abuse.ch ThreatFox — names malware phones home to (botnet control,
+    # payload delivery). Same key as URLhaus; shared platforms filtered out.
+    "threatfox":      ("blocklists/threatfox/hostfile.txt",   "hosts"),    # botnet / malware C2
     # Nov 2026: MetaMask's eth-phishing-detect — fake wallets, fake NFT/DeFi sites,
     # "connect your wallet" traps (~114k). Only ~2% were already covered by the
     # lists above. Shared platforms (github.io, blogspot…) appear only as the one
@@ -448,8 +451,23 @@ def read_metamask(path):
     return out
 
 
+# Nov 2026: the family filter was UT1 only, and adult sites got through (HaGeZi's
+# NSFW list alone named ~50,000 that UT1 misses, 274 of them top-100k sites).
+# These feed ONLY family.gbf, never the main filter. Picked for care, not size:
+# hand-kept lists with few wrong blocks. Tried and left out: StevenBlack's porn
+# extension (names kinopoisk.ru, yandex.by and a Danish newspaper) and
+# blocklistproject (950k names, cosmopolitan.com among them).
+FAMILY_EXTRA_SOURCES = {
+    "hagezi_nsfw":     ("blocklists/hagezi/nsfw.txt",            "adblock"),  # adult
+    "oisd_nsfw":       ("blocklists/oisd/oisd_nsfw.txt",         "adblock"),  # adult
+    # "medium" = the gambling sites people really reach (~75k); the full list is
+    # 690k mirror names for little extra.
+    "hagezi_gambling": ("blocklists/hagezi/gambling_medium.txt", "adblock"),  # gambling
+}
+
+
 def read_extra_source(name):
-    rel, fmt = EXTRA_SOURCES[name]
+    rel, fmt = (EXTRA_SOURCES.get(name) or FAMILY_EXTRA_SOURCES[name])
     path = os.path.join(ROOT, rel)
     if not os.path.isfile(path):
         return []
@@ -626,7 +644,22 @@ def main():
     family = set()
     for cat in FAMILY_CATEGORIES:
         family.update(read_category(cat))
+    family_ut1 = len(family)
+    print("\nFamily filter sources (UT1 categories: %d)..." % family_ut1)
+    for name in FAMILY_EXTRA_SOURCES:
+        doms = read_extra_source(name)
+        per_cat[name] = len(doms)
+        if doms:
+            fresh = sum(1 for d in doms if d not in family and not covered_by_parent(d, family))
+            family.update(doms)
+            print("  %-16s %8d  (%d not blocked before)" % (name, len(doms), fresh))
+        else:
+            print("  %-16s   (not present — skipped)" % name)
+    f_shielded = sorted(family & set(FAMILY_MUST_ALLOW))
+    if f_shielded:
+        print("  kept off the family list (must always work): " + ", ".join(f_shielded))
     family -= allow
+    family -= set(FAMILY_MUST_ALLOW)
     family_listed = len(family)
     # how many family names the main filter blocks anyway (itself or a parent). Counted, not removed:
     # the two files reach a phone on different days, so each has to stand on its own.
@@ -697,6 +730,7 @@ def main():
         "raw_total": raw_total,
         "protection_categories": {c: per_cat[c] for c in PROTECTION_CATEGORIES},
         "extra_sources": {name: per_cat.get(name, 0) for name in EXTRA_SOURCES},
+        "family_sources": {name: per_cat.get(name, 0) for name in FAMILY_EXTRA_SOURCES},
         "curated_always_block": len(ALWAYS_BLOCK_DOMAINS),
         "hashing": "SHA-256 -> h1=LE(bytes0-7), h2=LE(bytes8-15); "
                    "idx_i=(h1 + i*h2) mod m, i in 0..k-1",
@@ -712,6 +746,9 @@ def main():
             f.write("  %-16s %8d\n" % (c, per_cat[c]))
         f.write("\nExtra sources:\n")
         for name in EXTRA_SOURCES:
+            f.write("  %-16s %8d\n" % (name, per_cat.get(name, 0)))
+        f.write("\nFamily-filter-only sources:\n")
+        for name in FAMILY_EXTRA_SOURCES:
             f.write("  %-16s %8d\n" % (name, per_cat.get(name, 0)))
         f.write("\nUnique domains after dedupe: %d (from %d raw)\n" % (listed, raw_total))
         f.write("Stored in the filter: %d (%d were doubles under a listed parent)\n" % (n, listed - n))
