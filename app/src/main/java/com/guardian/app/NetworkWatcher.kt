@@ -36,7 +36,6 @@ object NetworkWatcher {
     private const val PREFS = TunnelActivity.PREFS
     const val KEY_AUTO = "auto_public_wifi"
     private const val KEY_ENGAGED = "auto_engaged"
-    private const val KEY_WANTED_BLOCKER = "auto_wanted_blocker"
     private const val CHANNEL_ID = "guardian_help"
     private const val NOTIF_ID = 450
 
@@ -117,13 +116,12 @@ object NetworkWatcher {
         val p = prefs(ctx)
         val cfg = SecretBox.loadTunnelConfig(ctx)
         if (!p.getBoolean(KEY_AUTO, true) || cfg.isBlank()) return     // no tunnel set up, or switched off
-        if (ParentLock.isOn(ctx)) return                              // v1.16.1: a child's device keeps Noxa's full filter (bedtime, family)
+        if (TunnelHandover.familyDevice(ctx)) return                  // v1.16.2: parent lock, bedtime, family filter or safe search: Noxa's full filter stays
         if (TunnelController.isUp) return                             // already tunnelling (maybe by hand)
         if (VpnService.prepare(ctx) != null) return                   // permission needs the app
         Thread {
             try {
-                val blockerWanted = GuardianVpnService.wantsProtection(ctx)
-                p.edit().putBoolean(KEY_WANTED_BLOCKER, blockerWanted).apply()
+                TunnelHandover.remember(ctx)
                 ctx.startService(Intent(ctx, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP)
                     .putExtra(ParentLock.EXTRA_UNLOCKED, true))     // the guard keeps protecting (tunnel + blocking DNS)
                 Thread.sleep(700)
@@ -134,7 +132,7 @@ object NetworkWatcher {
                     "It turns off by itself when you leave.")
             } catch (e: Exception) {
                 Log.w(TAG, "auto tunnel failed: $e")
-                restoreBlocker(ctx)
+                TunnelHandover.restore(ctx)
             }
         }.start()
     }
@@ -145,7 +143,7 @@ object NetworkWatcher {
         Thread {
             TunnelController.down(ctx)
             p.edit().putBoolean(KEY_ENGAGED, false).apply()
-            restoreBlocker(ctx)
+            TunnelHandover.restore(ctx)
             try { ctx.getSystemService(NotificationManager::class.java).cancel(NOTIF_ID) } catch (_: Exception) {}
         }.start()
     }
@@ -153,14 +151,6 @@ object NetworkWatcher {
     /** The user switched the tunnel by hand: the guard stops managing it. */
     fun userTookOver(ctx: Context) {
         prefs(ctx).edit().putBoolean(KEY_ENGAGED, false).apply()
-    }
-
-    private fun restoreBlocker(ctx: Context) {
-        if (!prefs(ctx).getBoolean(KEY_WANTED_BLOCKER, true)) return
-        val svc = Intent(ctx, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_START)
-        try {
-            if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc) else ctx.startService(svc)
-        } catch (e: Exception) { Log.w(TAG, "restore blocker: $e") }
     }
 
     private fun note(ctx: Context, title: String, text: String) {

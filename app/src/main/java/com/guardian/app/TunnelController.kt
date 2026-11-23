@@ -102,7 +102,7 @@ object TunnelDns {
             val t = raw.trim()
             if (t.startsWith("[")) {
                 if (inInterface && !dnsDone) { out.append(dnsLine).append('\n'); dnsDone = true }
-                inInterface = t.equals("[Interface]", ignoreCase = true)
+                inInterface = t.substringBefore('#').trim().equals("[Interface]", ignoreCase = true)   // "[Interface] # phone"
                 out.append(raw).append('\n'); continue
             }
             if (inInterface && t.startsWith("DNS", ignoreCase = true)) {

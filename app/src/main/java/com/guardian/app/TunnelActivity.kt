@@ -162,7 +162,8 @@ class TunnelActivity : Activity() {
         root.addView(muted("On a Wi-Fi with no password, or one with a login page (hotel, airport, " +
             "café), Noxa turns this tunnel on after you've logged in, and back off when you leave — " +
             "then normal blocking resumes. Needs a saved config above. Noxa can't see Wi-Fi names " +
-            "(that would need your location), only whether the Wi-Fi is open.")
+            "(that would need your location), only whether the Wi-Fi is open. Stays off while a " +
+            "parent lock, bedtime, the family filter or safe search is on: those need Noxa's own filter.")
             .apply { textSize = 12f; setPadding(0, dp(4), 0, dp(10)) })
 
         return ScrollView(this).apply { addView(root) }
@@ -221,6 +222,7 @@ class TunnelActivity : Activity() {
         val prep = VpnService.prepare(this)
         if (prep != null) { startActivityForResult(prep, REQ_VPN); return }
         // Only one VPN at a time — stop Guardian's blocking VPN to free the slot.
+        TunnelHandover.remember(this)          // v1.16.2: so the filter comes back when the tunnel ends
         startService(Intent(this, GuardianVpnService::class.java).setAction(GuardianVpnService.ACTION_STOP)
             .putExtra(ParentLock.EXTRA_UNLOCKED, true))         // the tunnel takes over: still protected
         NetworkWatcher.userTookOver(this)      // a tunnel the user starts is theirs, not the guard's
@@ -241,8 +243,9 @@ class TunnelActivity : Activity() {
                 }
             } catch (e: Exception) {
                 Log.w("Guardian", "tunnel up failed: $e")
+                val back = TunnelHandover.restore(this)      // never left with no tunnel AND no filter
                 runOnUiThread {
-                    wgStatus.text = "Couldn't connect: ${e.message}"
+                    wgStatus.text = "Couldn't connect: ${e.message}" + (if (back) " Noxa's own blocking is back on." else "")
                     setSwitch(false)
                 }
             }
@@ -254,7 +257,8 @@ class TunnelActivity : Activity() {
         NetworkWatcher.userTookOver(this)
         Thread {
             TunnelController.down(this)
-            runOnUiThread { wgStatus.text = "Tunnel is off." }
+            val back = TunnelHandover.restore(this)      // v1.16.2: Noxa's own filter takes the slot back
+            runOnUiThread { wgStatus.text = if (back) "Tunnel is off. Noxa's own blocking is back on." else "Tunnel is off." }
         }.start()
     }
 

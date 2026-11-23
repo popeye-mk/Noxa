@@ -1,6 +1,6 @@
 # Noxa: everything it is today
 
-*Version 1.16.1 (versionCode 34) · blocklist built 23 November 2026*
+*Version 1.16.2 (versionCode 35) · blocklist built 23 November 2026*
 
 Noxa is a free, open-source (AGPL-3.0) privacy and security blocker for
 Android phones, tablets and Android TV (Android 7.0 to 17). It runs
@@ -32,15 +32,15 @@ there is something to do.
 
 | List | Size | Used |
 |---|---|---|
-| **Main blocklist** (ads, trackers, malware, phishing, scams) | **1,217,671 domains** | always |
-| Dangerous-site list (to explain *why* something was blocked) | 712,318 | for warnings |
+| **Main blocklist** (ads, trackers, malware, phishing, scams) | **1,217,756 domains** | always |
+| Dangerous-site list (to explain *why* something was blocked) | 743,202 | for warnings |
 | Spyware (stalkerware) servers | 525 | always, with an alert |
 | Risky web endings (`.top`, `.xyz`, …) | 127 endings | only with *Strict scam protection* |
 | **Family filter** (adult, gambling, dating) | **5,133,088** | only when switched on |
 
-The main list merges 14 public lists, 2,121,456 entries in total before
+The main list merges 14 public lists, 2,121,561 entries in total before
 removing duplicates. Nothing is stored twice: a name under an already listed
-domain is left out (109,995 of them) and stays blocked through its parent.
+domain is left out (110,069 of them) and stays blocked through its parent.
 
 | Source | Domains |
 |---|---|
@@ -48,10 +48,10 @@ domain is left out (109,995 of them) and stays blocked through its parent.
 | HaGeZi Pro | 236,199 |
 | OISD | 220,866 |
 | AdGuard DNS | 193,322 |
-| Phishing Army | 146,100 |
-| MetaMask crypto-scam list (fake wallets, fake NFT/DeFi sites) | 120,752 |
+| Phishing Army | 146,203 |
+| MetaMask crypto-scam list (fake wallets, fake NFT/DeFi sites) | 120,753 |
 | StevenBlack | 76,105 |
-| EasyList | 48,481 |
+| EasyList | 48,482 |
 | EasyPrivacy | 47,532 |
 | abuse.ch ThreatFox (servers malware phones home to) | 27,842 |
 | Dandelion Sprout Anti-Malware | 11,508 |
@@ -124,7 +124,8 @@ again itself and keeps the old one if anything looks wrong.
 - **Weekly summary** every Sunday evening.
 - **Public Wi-Fi guard**: on Wi-Fi with no password or with a login page,
   your "Hide my IP" tunnel switches on after login and off when you leave.
-  It needs a saved tunnel config.
+  It needs a saved tunnel config, and stays off on a device with a parent
+  lock, bedtime, the family filter or safe search.
 - **Update notice**: once a day it checks for a newer Noxa. Updating takes one
   tap, and the download must be Noxa, newer than your copy, and signed with
   the Noxa release key.
@@ -211,7 +212,9 @@ Noxa sends nothing about you anywhere. Its only own network calls are:
   versus 97% with Noxa's own filter. With the family filter or safe search
   on, the tunnel uses AdGuard Family DNS (adult sites blocked, about 79% of
   ads); bedtime and per-app rules rest in the tunnel, so a parent lock asks
-  for the PIN before the tunnel can be switched on.
+  for the PIN before the tunnel can be switched on. When the tunnel ends
+  (switched off, failed to connect, phone restarted), Noxa's own filter
+  comes back by itself.
 - Lists are lists: rarely a site is wrongly blocked (fix it with one tap) or
   missed.
 - Android lets anyone uninstall an app; the parent lock can't stop that. A

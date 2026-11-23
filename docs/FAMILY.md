@@ -36,7 +36,14 @@ Since 1.16 a home server also hears at once when the VPN is taken away from Noxa
   stay blocked and safe search stays forced. Gambling and dating sites,
   bedtime, per-app rules and your own allowed/blocked sites do not apply in
   the tunnel. That is why, with a parent lock set, switching the tunnel on
-  asks for the PIN, and the public Wi-Fi guard leaves the tunnel off.
+  asks for the PIN, and the public Wi-Fi guard leaves the tunnel off on any
+  device with a parent lock, bedtime, the family filter or safe search.
+  Since 1.16.2 Noxa's own filter comes back by itself when the tunnel ends
+  (switched off, failed to connect, phone restarted). Two things to know:
+  a family filter switched on while the tunnel is already up takes effect
+  the next time the tunnel is switched on; and a few VPN providers answer
+  all DNS inside their tunnel themselves, so open an adult site once with
+  the tunnel on to check that your provider lets the family resolver work.
 
 ## Setting up a child's device (5 minutes)
 

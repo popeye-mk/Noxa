@@ -78,10 +78,10 @@ Built **23 November 2026** (rebuilt every Monday; numbers change a little each w
 | [HaGeZi Pro](https://github.com/hagezi/dns-blocklists) | ads, tracking, analytics, telemetry | 236,199 |
 | [OISD Big](https://oisd.nl) | ads, trackers, malware | 220,866 |
 | [AdGuard DNS filter](https://github.com/AdguardTeam/HostlistsRegistry) | ads, trackers | 193,322 |
-| [Phishing Army (extended)](https://phishing.army) | phishing | 146,100 |
-| [MetaMask eth-phishing-detect](https://github.com/MetaMask/eth-phishing-detect) | crypto scams, fake wallets, wallet drainers | 120,752 |
+| [Phishing Army (extended)](https://phishing.army) | phishing | 146,203 |
+| [MetaMask eth-phishing-detect](https://github.com/MetaMask/eth-phishing-detect) | crypto scams, fake wallets, wallet drainers | 120,753 |
 | [StevenBlack hosts](https://github.com/StevenBlack/hosts) | ads, malware | 76,105 |
-| [EasyList](https://easylist.to) | ads | 48,481 |
+| [EasyList](https://easylist.to) | ads | 48,482 |
 | [EasyPrivacy](https://easylist.to) | trackers | 47,532 |
 | [abuse.ch ThreatFox](https://threatfox.abuse.ch) | servers malware phones home to (free key) | 27,842 |
 | [Dandelion Sprout Anti-Malware](https://github.com/DandelionSprout/adfilt) | malware | 11,508 |
@@ -89,13 +89,13 @@ Built **23 November 2026** (rebuilt every Monday; numbers change a little each w
 | [abuse.ch URLhaus](https://urlhaus.abuse.ch) | sites spreading malware *right now* (free key) | 621 |
 | [NoCoin](https://github.com/hoshsadiq/adblock-nocoin-list) | crypto mining in the browser | 312 |
 
-**Total: 1,217,671 different domains blocked** (2,121,456 entries before removing duplicates). Nothing is stored twice: 109,995 of them sit under a domain that is already listed, so the filter holds 1,107,676 entries and still blocks every one.
+**Total: 1,217,756 different domains blocked** (2,121,561 entries before removing duplicates). Nothing is stored twice: 110,069 of them sit under a domain that is already listed, so the filter holds 1,107,687 entries and still blocks every one.
 
 Shipped next to it:
 
 | List | Size | Used |
 |---|---|---|
-| Dangerous-site list (scam / phishing / malware, for the warning) | 712,318 | always |
+| Dangerous-site list (scam / phishing / malware, for the warning) | 743,202 | always |
 | Spyware (stalkerware) servers | 525 | always, with an alert |
 | Risky web endings (`.top`, `.xyz`, …) | 127 endings | only with *Strict scam protection* |
 | Family filter (adult, gambling, dating) | 5,133,088 | only when a parent switches it on |
