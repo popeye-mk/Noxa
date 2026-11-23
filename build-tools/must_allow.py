@@ -41,3 +41,17 @@ MUST_ALLOW = [
     "whatsapp.com", "web.whatsapp.com", "g.whatsapp.net", "mmg.whatsapp.net",
     "messenger.com", "scontent.xx.fbcdn.net", "static.xx.fbcdn.net",
 ]
+
+# The family filter (adult / gambling / dating) must additionally never flag
+# these: everyday and children's sites. Kept off family.gbf by the build even
+# when a source names one; verify_build.py refuses a build that blocks one
+# another way.
+FAMILY_MUST_ALLOW = MUST_ALLOW + [
+    "wikipedia.org", "nl.wikipedia.org", "youtube.com", "www.youtube.com", "netflix.com", "disneyplus.com",
+    "ketnet.be", "vrt.be", "vrtmax.be", "nickelodeon.com", "duolingo.com", "khanacademy.org", "scratch.mit.edu",
+    "smartschool.be", "bingel.be", "kidsweek.nl", "bbc.co.uk", "nasa.gov", "klascement.net",
+    # mixed places a careless list sometimes calls "adult": whole platforms stay reachable
+    "reddit.com", "www.reddit.com", "x.com", "twitter.com", "tumblr.com", "pinterest.com",
+    "twitch.tv", "discord.com", "tiktok.com", "www.tiktok.com", "snapchat.com", "telegram.org",
+    "spotify.com", "amazon.com", "archive.org", "medium.com", "wordpress.com", "blogspot.com",
+]
