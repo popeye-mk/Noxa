@@ -33,7 +33,11 @@ Since 1.16 a home server also hears at once when the VPN is taken away from Noxa
 - **"Hide my IP" (the tunnel).** Only one VPN can run, so Noxa's own filter
   rests while the tunnel is on. Since 1.16.1 the tunnel then uses AdGuard
   Family DNS whenever the family filter or safe search is on: adult sites
-  stay blocked and safe search stays forced. Gambling and dating sites,
+  stay blocked and safe search stays forced. That resolver catches fewer
+  ads (about 80% in the ad-block test, against 95% for the tunnel's usual
+  HaGeZi DNS) and no free resolver does both, so since 1.16.3 the tunnel
+  screen has a switch, "Block adult sites in the tunnel too" (on by
+  default; behind the parent PIN when there is one). Gambling and dating sites,
   bedtime, per-app rules and your own allowed/blocked sites do not apply in
   the tunnel. That is why, with a parent lock set, switching the tunnel on
   asks for the PIN, and the public Wi-Fi guard leaves the tunnel off on a

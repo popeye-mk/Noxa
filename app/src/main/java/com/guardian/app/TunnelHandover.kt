@@ -29,7 +29,7 @@ object TunnelHandover {
 
     /** A device a parent set up: parent lock, bedtime, family filter or safe search. */
     fun familyDevice(ctx: Context): Boolean =
-        ParentLock.isOn(ctx) || Bedtime.isOn(ctx) || TunnelController.familyWanted(ctx)
+        ParentLock.isOn(ctx) || Bedtime.isOn(ctx) || TunnelController.familyOn(ctx)
 
     /** v1.16.3: when the public Wi-Fi guard must leave the tunnel off. Only what the tunnel would switch
      *  off for a child: bedtime, and anything behind a parent PIN. The family filter and safe search alone
