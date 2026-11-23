@@ -16,6 +16,7 @@ import json
 import sys
 
 DROP = 0.5   # report if a source lost more than half its domains
+RENAMED = {"hagezi_tif_mini": "hagezi_tif"}   # old name -> new name (not a broken source)
 
 
 def problems(new_counts, old_counts):
@@ -25,6 +26,9 @@ def problems(new_counts, old_counts):
         old = int(old_counts.get(name) or 0)
         if old <= 0:
             continue                      # was already empty/skipped: nothing new to say
+        name_now = RENAMED.get(name, name)
+        if name_now != name and name_now in new_counts:
+            new_counts = {**new_counts, name: new_counts[name_now]}
         if name not in new_counts:
             out.append(f"{name}: missing from this build (had {old:,} domains)")
             continue

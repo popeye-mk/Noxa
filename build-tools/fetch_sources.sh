@@ -53,9 +53,9 @@ get "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Alternate%2
 get "https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/hosts.txt"      "nocoin/hosts.txt"
 get "https://phishing.army/download/phishing_army_blocklist_extended.txt"                   "phishing/phishing_army.txt"
 # v1.10 stronger malware protection:
-# HaGeZi Threat Intelligence Feeds, "mini" (~180k of the most important
-# malware / phishing / scam / C2 feeds — sized for phones).
-get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/tif.mini.txt"     "hagezi/tif_mini.txt"
+# HaGeZi Threat Intelligence Feeds, "medium" (~370k malware / phishing / scam /
+# botnet-control names; "mini" was ~190k until Nov 2026, the full feed is 1M+).
+get "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/tif.medium.txt"   "hagezi/tif_medium.txt"
 # abuse.ch URLhaus: hosts serving malware downloads right now (small, fresh).
 # Since Oct 2026 the keyless hostfile is gone (410); the feed is a CSV export
 # behind a free abuse.ch Auth-Key (repo secret ABUSECH_AUTH_KEY). The key sits
