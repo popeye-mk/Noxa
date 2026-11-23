@@ -163,6 +163,12 @@ NEVER_THREAT = [
     "whatsapp.com", "whatsapp.net", "apple.com", "mzstatic.com", "icloud.com",
     "microsoft.com", "windows.com", "live.com", "office.com", "xbox.com",
     "playstation.com", "nintendo.net", "roblox.com", "rbxcdn.com",
+    # 23 Nov 2026: well-known analytics / advertising companies. A phone showed "Dangerous site blocked:
+    # upload.luckyorange.net is a known scam, phishing or malware site". Lucky Orange records what visitors do
+    # on a website: a tracker, rightly blocked, but not a scam. HaGeZi's threat feed names one host of each of
+    # these; they stay blocked as trackers and only lose the scary label.
+    "luckyorange.net", "luckyorange.com", "criteo.com", "criteo.net", "cnzz.com", "gemius.pl",
+    "rambler.ru", "alimama.com",
 ]
 
 
