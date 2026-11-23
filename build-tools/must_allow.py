@@ -40,6 +40,9 @@ MUST_ALLOW = [
     "instagram.com", "www.instagram.com", "i.instagram.com",
     "whatsapp.com", "web.whatsapp.com", "g.whatsapp.net", "mmg.whatsapp.net",
     "messenger.com", "scontent.xx.fbcdn.net", "static.xx.fbcdn.net",
+    # 23 Nov 2026: abuse.ch ThreatFox named these because someone once parked a bad file there. Python's
+    # package store: blocking it breaks every "pip install".
+    "pypi.org", "files.pythonhosted.org",
 ]
 
 # The family filter (adult / gambling / dating) must additionally never flag
@@ -54,4 +57,8 @@ FAMILY_MUST_ALLOW = MUST_ALLOW + [
     "reddit.com", "www.reddit.com", "x.com", "twitter.com", "tumblr.com", "pinterest.com",
     "twitch.tv", "discord.com", "tiktok.com", "www.tiktok.com", "snapchat.com", "telegram.org",
     "spotify.com", "amazon.com", "archive.org", "medium.com", "wordpress.com", "blogspot.com",
+    # 23 Nov 2026, found by comparing the new family filter with the most-used sites: whole hosting
+    # companies, a big Chinese shop and a developer tool that a list calls "adult". One bad customer
+    # page is not the whole service.
+    "blogspot.ru", "sslip.io", "vip.com", "prv.pl", "transip.me", "meusitehostgator.com.br",
 ]

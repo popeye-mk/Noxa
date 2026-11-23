@@ -169,6 +169,13 @@ NEVER_THREAT = [
     # these; they stay blocked as trackers and only lose the scary label.
     "luckyorange.net", "luckyorange.com", "criteo.com", "criteo.net", "cnzz.com", "gemius.pl",
     "rambler.ru", "alimama.com",
+    # Same day: the bigger threat feed names adclick.g.doubleclick.net - the address every tap on a Google ad
+    # goes through - so each tap would have raised "Dangerous site blocked". The big advertising and
+    # analytics names are trackers: blocked, never called a scam.
+    "doubleclick.net", "googlesyndication.com", "googleadservices.com", "google-analytics.com",
+    "googletagmanager.com", "googletagservices.com", "app-measurement.com", "adnxs.com",
+    "amazon-adsystem.com", "scorecardresearch.com", "taboola.com", "outbrain.com", "hotjar.com",
+    "mouseflow.com", "fullstory.com", "clarity.ms", "appsflyer.com", "adjust.com", "branch.io",
 ]
 
 
@@ -565,10 +572,16 @@ def main():
     print("Reading UT1 protection categories...")
     per_cat = {}
     all_domains = set()
+    must = set(MUST_ALLOW)
+    named_by = {}                      # must-allow site -> the sources that name it (for the log)
+    def note_must(source, doms):
+        for d in must.intersection(doms):
+            named_by.setdefault(d, []).append(source)
     for cat in PROTECTION_CATEGORIES:
         doms = read_category(cat)
         per_cat[cat] = len(doms)
         all_domains.update(doms)
+        note_must("ut1:" + cat, doms)
         print("  %-16s %8d" % (cat, len(doms)))
 
     print("\nReading extra sources (skipped if not downloaded yet)...")
@@ -577,6 +590,7 @@ def main():
         per_cat[name] = len(doms)
         if doms:
             all_domains.update(doms)
+            note_must(name, doms)
             print("  %-16s %8d" % (name, len(doms)))
         else:
             print("  %-16s   (not present — skipped)" % name)
@@ -592,7 +606,8 @@ def main():
     # blocks one of them another way (e.g. a whole parent domain).
     shielded = sorted(all_domains & set(MUST_ALLOW))
     if shielded:
-        print("  kept off (named by a source, but must always work): " + ", ".join(shielded))
+        print("  kept off (named by a source, but must always work): "
+              + ", ".join("%s [%s]" % (d, "+".join(named_by.get(d, ["?"]))) for d in shielded))
     allow.update(MUST_ALLOW)
     before = len(all_domains)
     all_domains -= allow

@@ -1,4 +1,5 @@
-1.16.3 — the public Wi-Fi guard works again with the family filter on
+1.16.3 — fixes after checking yesterday's bigger lists
 
-• 1.16.2 stopped the public Wi-Fi guard on any phone with the family filter or safe search on. It now only rests on a device with a parent lock or bedtime; the tunnel keeps adult sites blocked anyway.
-• A tracker is no longer called a "scam site": well-known analytics companies stay blocked without the dangerous-site warning.
+• The public Wi-Fi guard works again with the family filter on (1.16.2 stopped it). It now only rests with a parent lock or bedtime.
+• Well-known services a new malware feed blocked by mistake work again (Python packages, picture and file hosts, GoDaddy-built shops).
+• A tracker is no longer called a "scam site": tapping a Google ad or a site using Lucky Orange no longer raises the dangerous-site warning.

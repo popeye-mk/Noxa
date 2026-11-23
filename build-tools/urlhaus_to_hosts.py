@@ -45,6 +45,37 @@ SHARED_PLATFORMS = (
     "tiktok.com", "reddit.com", "notion.so", "trello.com", "ipify.org",
     "ip-api.com", "ipinfo.io", "icanhazip.com", "ifconfig.me", "dyndns.org",
     "myexternalip.com", "cloudflare.com", "quad9.net",
+    # 23 Nov 2026, first day of ThreatFox: it named files.pythonhosted.org (every "pip install"),
+    # img1.wsimg.com (the pictures of every GoDaddy-built shop), i.postimg.cc, www.sendspace.com and
+    # files.constantcontact.com - places where ONE bad file was parked. The rule above, widened:
+    # package stores, picture and file hosts, site builders, mail services, CDNs.
+    "pythonhosted.org", "pypi.org", "npmjs.org", "npmjs.com", "unpkg.com", "jsdelivr.net",
+    "rubygems.org", "crates.io", "nuget.org", "packagist.org", "maven.org", "docker.com", "docker.io",
+    "gitee.com", "codeberg.org", "sourceforge.io", "launchpad.net",
+    "postimg.cc", "postimages.org", "imgur.com", "imgbb.com", "ibb.co", "flickr.com", "staticflickr.com",
+    "photobucket.com", "pinimg.com", "giphy.com", "tenor.com", "gyazo.com", "prnt.sc",
+    "wsimg.com", "godaddy.com", "secureserver.net", "wixstatic.com", "wix.com", "squarespace.com",
+    "squarespace-cdn.com", "weebly.com", "shopify.com", "wordpress.com", "wp.com", "blogger.com",
+    "tumblr.com", "medium.com", "notion.site", "atlassian.net", "canva.com",
+    "constantcontact.com", "mailchimp.com", "list-manage.com", "sendgrid.net", "hubspot.com",
+    "hubspotusercontent.net", "zendesk.com", "freshdesk.com", "slack.com", "slack-files.com", "zoom.us",
+    "sendspace.com", "zippyshare.com", "gofile.io", "pixeldrain.com", "file.io", "krakenfiles.com",
+    "workupload.com", "filebin.net", "files.fm", "we.tl", "transfernow.net", "swisstransfer.com",
+    "pcloud.com", "pcloud.link", "mega.io", "uploadcare.com", "cloudinary.com", "imagekit.io",
+    "paste.ee", "hastebin.com", "rentry.co", "rentry.org", "justpaste.it", "telegra.ph", "controlc.com",
+    "fastly.net", "akamaized.net", "akamaihd.net", "edgekey.net", "edgesuite.net", "cloudflare.net",
+    "digitaloceanspaces.com", "backblazeb2.com", "wasabisys.com", "bunnycdn.com",
+    "office.com", "office365.com", "outlook.com", "live.net", "msn.com", "bing.com", "azure.com",
+    "windowsupdate.com", "skype.com", "linkedin.com", "licdn.com", "cdn-apple.com", "mzstatic.com",
+    "gstatic.com", "gvt1.com", "ggpht.com", "ytimg.com", "googlevideo.com", "android.com",
+    "amazon.com", "media-amazon.com", "adobe.com", "oracle.com", "cisco.com", "zoho.com",
+    "yandex.net", "yandex.com", "mail.ru", "vk.com", "userapi.com", "baidu.com", "qq.com", "weiyun.com",
+    "360safe.com", "360.cn", "steamusercontent.com", "steamstatic.com", "epicgames.com", "roblox.com",
+    "rbxcdn.com", "twitch.tv", "redd.it", "redditmedia.com", "pinterest.com", "whatsapp.com",
+    "signal.org", "viber.com", "spotify.com", "scdn.co", "netflix.com", "paypal.com", "paypalobjects.com",
+    "ebay.com", "aliexpress.com", "alicdn.com", "wikipedia.org", "wikimedia.org", "stackoverflow.com",
+    "mozilla.org", "mozilla.net", "ubuntu.com", "debian.org", "python.org", "nodejs.org",
+    "samsung.com", "mi.com", "xiaomi.com", "miui.com", "huawei.com", "hicloud.com",
 )
 
 
