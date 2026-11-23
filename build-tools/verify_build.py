@@ -72,6 +72,16 @@ sample = domains if len(domains) <= 50000 else random.Random(1).sample(domains, 
 missing = [d for d in sample if not contains(d)]
 check("no false negatives (sample of %d)" % len(sample), not missing, ", ".join(missing[:5]))
 
+# Nov 2026: names removed because a listed parent covers them must all still be blocked.
+pruned_path = os.path.join(OUT, "pruned-sample.txt")
+if os.path.isfile(pruned_path):
+    pruned = [l.strip() for l in open(pruned_path) if l.strip()]
+    lost = [d for d in pruned if not blocked(d)]
+    check("names covered by a listed parent are still blocked (%d checked)" % len(pruned), not lost, ", ".join(lost[:5]))
+    stored = set(domains)
+    check("no stored name has a stored parent left", not any(
+        any(".".join(d.split(".")[i:]) in stored for i in range(1, d.count("."))) for d in sample[:5000]))
+
 # False-positive sanity. The filter targets 1e-6, i.e. ~1 hit per million
 # random names, so this catches a BROKEN build (wrong m/k, bit array mostly
 # set: hundreds of hits) without tripping on chance: the old 200k-trial
@@ -204,10 +214,20 @@ else:
     check("no risky endings => manifest has no hash", not manifest.get("risky_tlds_sha256"))
 
 if os.path.isfile(SHIPPED):
-    old = json.load(open(SHIPPED)).get("unique_domains", 0)
+    shipped = json.load(open(SHIPPED))
+    # Compare like with like: what the SOURCES list (before doubles under a parent are removed), so a
+    # source that silently failed still shows. A shipped list from before Nov 2026 has only unique_domains.
+    old = shipped.get("listed_domains") or shipped.get("unique_domains", 0)
+    new = manifest.get("listed_domains") or n
     if old:
-        ratio = n / old
-        check(f"size sane vs shipped ({old:,} -> {n:,})", 1 - MAX_DROP <= ratio <= MAX_GROWTH, f"ratio {ratio:.3f}")
+        ratio = new / old
+        check(f"size sane vs shipped ({old:,} -> {new:,} listed)", 1 - MAX_DROP <= ratio <= MAX_GROWTH, f"ratio {ratio:.3f}")
+    # Every phone checks a new list itself and refuses one with fewer than HALF the entries of the list it
+    # has (FilterSanity.mainOk). Never ship a filter that phones would turn down.
+    old_stored = shipped.get("unique_domains", 0)
+    if old_stored:
+        check(f"phones will accept it ({old_stored:,} -> {n:,} stored, must stay above 60%)",
+              n >= 0.6 * old_stored, f"ratio {n / old_stored:.3f}")
 
 if failures:
     print(f"\nREFUSED: {len(failures)} check(s) failed — the new filter must not ship.")

@@ -462,6 +462,23 @@ def read_extra_source(name):
     return read_adblock(path)
 
 
+def covered_by_parent(domain: str, listed) -> bool:
+    """True when a PARENT of [domain] is in [listed] (the domain itself doesn't count).
+    Same walk as the app: every suffix that still has a dot ("a.b.c.com" -> "b.c.com", "c.com")."""
+    p = domain.split(".")
+    return any(".".join(p[i:]) in listed for i in range(1, len(p) - 1))
+
+
+def prune_covered(domains: set) -> set:
+    """Nov 2026: drop every name a listed parent already blocks.
+
+    The app checks a looked-up name AND each of its parents, so with "tracker.com" listed,
+    "a.tracker.com" and "b.x.tracker.com" add nothing: about one entry in ten was such a double.
+    Removing them changes nothing that is blocked; the filter gets smaller and its (already tiny)
+    false-positive count drops with it."""
+    return {d for d in domains if not covered_by_parent(d, domains)}
+
+
 def bloom_params(n: int, p: float):
     """Return (m_bits, k_hashes) for n items at false-positive rate p."""
     if n <= 0:
@@ -560,9 +577,17 @@ def main():
     print("  curated always-block: %d domains (%d not already listed)"
           % (len(ALWAYS_BLOCK_DOMAINS), len(added)))
 
-    n = len(all_domains)
+    listed = len(all_domains)                 # every different name the sources list
     raw_total = sum(per_cat.values())
-    print("\nMerged + deduplicated: %d unique domains (from %d raw)" % (n, raw_total))
+    print("\nMerged + deduplicated: %d unique domains (from %d raw)" % (listed, raw_total))
+    full_domains = all_domains                # the dangerous-site set below is cut from the full list
+    all_domains = prune_covered(full_domains)
+    n = len(all_domains)                      # what the filter stores
+    print("Already covered by a listed parent: %d (%.1f%%) -> %d stored"
+          % (listed - n, 100.0 * (listed - n) / max(1, listed), n))
+    removed = sorted(full_domains - all_domains)
+    with open(os.path.join(OUT, "pruned-sample.txt"), "w") as f:      # for the verifier: these must stay blocked
+        f.write("\n".join(removed[::max(1, len(removed) // 20000)]))
 
     domains = sorted(all_domains)
     m_bits, k = bloom_params(n, FALSE_POSITIVE_RATE)
@@ -585,9 +610,10 @@ def main():
         threats.update(read_category(cat))
     for name in THREAT_EXTRA_SOURCES:
         threats.update(read_extra_source(name))
-    threats &= all_domains
+    threats &= full_domains
     threats = {d for d in threats if not is_never_threat(d)}      # v1.14.5: see NEVER_THREAT
-    threats = sorted(threats)
+    threats_listed = len(threats)
+    threats = sorted(prune_covered(threats))                      # doubles inside the dangerous-site set only
     t_m, t_k = bloom_params(len(threats), FALSE_POSITIVE_RATE)
     write_gbf(os.path.join(OUT, "threats.gbf"), t_m, t_k, len(threats), build_bloom(threats, t_m, t_k))
     with open(os.path.join(OUT, "threats.gbf"), "rb") as f:
@@ -601,7 +627,13 @@ def main():
     for cat in FAMILY_CATEGORIES:
         family.update(read_category(cat))
     family -= allow
-    family = sorted(family)
+    family_listed = len(family)
+    # how many family names the main filter blocks anyway (itself or a parent). Counted, not removed:
+    # the two files reach a phone on different days, so each has to stand on its own.
+    family_in_main = sum(1 for d in family if d in full_domains or covered_by_parent(d, full_domains))
+    family = sorted(prune_covered(family))
+    print("Family list: %d listed, %d already covered by a listed parent, %d also blocked by the main filter"
+          % (family_listed, family_listed - len(family), family_in_main))
     f_m, f_k = bloom_params(len(family), FAMILY_FALSE_POSITIVE_RATE)
     write_gbf(os.path.join(OUT, "family.gbf"), f_m, f_k, len(family), build_bloom(family, f_m, f_k))
     with open(os.path.join(OUT, "family.gbf"), "rb") as f:
@@ -657,7 +689,11 @@ def main():
         "family_bloom": {"m_bits": f_m, "k_hashes": f_k},
         "bloom": {"m_bits": m_bits, "k_hashes": k,
                   "size_mb": round(size_mb, 3), "items": n},
-        "unique_domains": n,
+        "unique_domains": n,                     # stored in the filter (doubles under a listed parent removed)
+        "listed_domains": listed,                # every different name the sources list; all of them are blocked
+        "threats_listed": threats_listed,
+        "family_listed": family_listed,
+        "family_also_in_main": family_in_main,   # so "main + family" can be counted without doubles
         "raw_total": raw_total,
         "protection_categories": {c: per_cat[c] for c in PROTECTION_CATEGORIES},
         "extra_sources": {name: per_cat.get(name, 0) for name in EXTRA_SOURCES},
@@ -677,7 +713,8 @@ def main():
         f.write("\nExtra sources:\n")
         for name in EXTRA_SOURCES:
             f.write("  %-16s %8d\n" % (name, per_cat.get(name, 0)))
-        f.write("\nUnique domains after dedupe: %d (from %d raw)\n" % (n, raw_total))
+        f.write("\nUnique domains after dedupe: %d (from %d raw)\n" % (listed, raw_total))
+        f.write("Stored in the filter: %d (%d were doubles under a listed parent)\n" % (n, listed - n))
         f.write("Bloom filter: %.2f MB, k=%d, FP target %.0e\n"
                 % (size_mb, k, FALSE_POSITIVE_RATE))
         f.write("Build time: %.1fs\n" % build_s)
