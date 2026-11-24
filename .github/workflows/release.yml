@@ -68,7 +68,10 @@ jobs:
       # signing key on disk. A release is built from a cold cache — a minute slower, nothing else.
 
       - name: Unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
+        # Waits and retries when a download is refused (Maven Central 429). An older tag has no such script.
+        run: |
+          if [ -x .github/scripts/gradlew-retry.sh ]; then .github/scripts/gradlew-retry.sh --no-daemon testDebugUnitTest
+          else ./gradlew --no-daemon testDebugUnitTest; fi
 
       - name: Write signing config (never printed, deleted after)
         env:
@@ -86,7 +89,9 @@ jobs:
           } > keystore.properties
 
       - name: Build signed release APK
-        run: ./gradlew --no-daemon assembleRelease
+        run: |
+          if [ -x .github/scripts/gradlew-retry.sh ]; then .github/scripts/gradlew-retry.sh --no-daemon assembleRelease
+          else ./gradlew --no-daemon assembleRelease; fi
 
       - name: Verify the APK is signed with the release key
         run: |

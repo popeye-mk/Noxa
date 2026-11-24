@@ -37,10 +37,10 @@ jobs:
           cache-provider: basic
 
       - name: Unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
+        run: .github/scripts/gradlew-retry.sh --no-daemon testDebugUnitTest   # waits and retries when a download is refused (429)
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+        run: .github/scripts/gradlew-retry.sh --no-daemon assembleDebug
 
       # A plain .apk (not a zip) so it can be tapped and installed straight
       # from a phone. archive:false names the artifact after the file.
